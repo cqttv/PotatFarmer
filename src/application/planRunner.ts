@@ -1,5 +1,6 @@
-import type { CommandPlan } from "@domain/types";
-import { logger, sleep } from "@shared/utils";
+import type { CommandPlan } from "@domain/interfaces/commandPlan";
+import { logger } from "@shared/utils/logger";
+import { sleep } from "@shared/utils/sleep";
 import { sendCommand } from "@infrastructure/api";
 
 export async function runPlan(plan: CommandPlan): Promise<void> {

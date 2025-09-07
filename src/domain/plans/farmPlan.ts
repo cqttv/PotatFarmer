@@ -1,8 +1,8 @@
-import { FIFTEEN_SECONDS_MS } from "@shared/config";
-import type { CommandPlan } from "@domain/types";
+import { FIFTEEN_SECONDS_MS } from "@shared/configs/msDurations";
 import { Actions } from "@domain/actions";
+import type { CommandPlan } from "@domain/interfaces/commandPlan";
 
-export const FARM_PLAN: CommandPlan = {
+export const FarmPlan: CommandPlan = {
   name: "Farming Plan",
   commands: [
     { command: Actions.SHOP_CDR, delay: FIFTEEN_SECONDS_MS },
