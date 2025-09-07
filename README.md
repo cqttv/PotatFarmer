@@ -11,5 +11,4 @@
 - cd to PotatFarmer directory
 - npm install
 - npm run build
-- Place .env file in dist/ folder
 - npm run start
