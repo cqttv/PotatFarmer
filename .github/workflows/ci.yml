@@ -17,6 +17,8 @@ jobs:
       # Checkout repo
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Setup Node.js
       - name: Set up Node.js
