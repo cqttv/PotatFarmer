@@ -1,6 +1,8 @@
 {
   "type": "module",
   "scripts": {
+    "prettier": "npx prettier --check .",
+    "prettier:fix": "npx prettier --write .",
     "lint": "eslint ./src --max-warnings=0",
     "lint:fix": "eslint ./src --fix",
     "build": "tsup",
