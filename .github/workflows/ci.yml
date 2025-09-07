@@ -1,0 +1,81 @@
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout repo
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Setup Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Install deps
+      - name: Install dependencies
+        run: npm ci
+
+      # Formatting check
+      - name: Run Prettier
+        run: npx prettier --check .
+
+      # Linting
+      - name: Run ESLint
+        run: npx eslint . --max-warnings=0
+
+      # TypeScript type-check (no emit)
+      - name: Type check
+        run: npm run type-check
+
+      # Build project
+      - name: Build
+        run: npm run build
+
+      # Dependency health check
+      - name: Check outdated dependencies
+        run: npm outdated
+
+      # Security audit (npm)
+      - name: Run npm audit
+        run: npm audit --audit-level=low
+
+      # Security scanning (Semgrep)
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: "p/security-audit"
+
+      # Secret scanning (Gitleaks)
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+
+      # Dependency vuln scanning (Trivy)
+      - name: Run Trivy FS Scan
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: LOW,MEDIUM,HIGH,CRITICAL
+
+      # Upload build artifacts
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-build
+          path: |
+            dist/
+            !**/*.spec.*js
+            package.json
