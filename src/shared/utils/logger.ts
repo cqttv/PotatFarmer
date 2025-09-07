@@ -1,39 +1,13 @@
 import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
-import type { Logger } from "@shared/types";
-import { LOG_LEVEL } from "@shared/config";
+import type { Logger } from "@shared/interfaces/logger";
+import { LOG_LEVEL } from "@shared/configs/appConfig";
+import { LogLevels } from "@shared/configs/logsLevels";
 
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-const logLevels = {
-  levels: {
-    emerg: 0,
-    alert: 1,
-    crit: 2,
-    error: 3,
-    warning: 4,
-    notice: 5,
-    info: 6,
-    debug: 7,
-  },
-  colors: {
-    emerg: "red",
-    alert: "red",
-    crit: "red",
-    error: "red",
-    warning: "yellow",
-    notice: "cyan",
-    info: "green",
-    debug: "blue",
-  },
-};
-
-winston.addColors(logLevels.colors);
+winston.addColors(LogLevels.colors);
 
 const winstonLogger = winston.createLogger({
-  levels: logLevels.levels,
+  levels: LogLevels.levels,
   level: LOG_LEVEL,
   format: winston.format.combine(
     winston.format.colorize(),

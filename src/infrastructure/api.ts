@@ -1,6 +1,7 @@
-import { BEARER_TOKEN, API_URL, BOT_PREFIX } from "@shared/config";
-import { logger } from "@shared/utils";
-import type { ApiResponse, ApiResponseData } from "@domain/types";
+import { BEARER_TOKEN, API_URL, BOT_PREFIX } from "@shared/configs/appConfig";
+import { logger } from "@shared/utils/logger";
+import type { PotatApiResponse } from "@domain/interfaces/potatApiResponse";
+import type { PotatApiResponseData } from "@domain/interfaces/potatApiResponseData";
 
 export async function sendCommand(command: string): Promise<void> {
   const response = await fetch(API_URL, {
@@ -16,7 +17,7 @@ export async function sendCommand(command: string): Promise<void> {
     throw new Error(`HTTP error: ${response.status}`);
   }
 
-  const data = (await response.json()) as ApiResponse;
+  const data = (await response.json()) as PotatApiResponse;
 
   if (data.statusCode !== 200) {
     const errorMsg =
@@ -25,7 +26,7 @@ export async function sendCommand(command: string): Promise<void> {
   }
 
   const rawData = data.data;
-  const normalizedData: ApiResponseData[] = Array.isArray(rawData)
+  const normalizedData: PotatApiResponseData[] = Array.isArray(rawData)
     ? rawData
     : [rawData];
 
