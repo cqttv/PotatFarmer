@@ -35,7 +35,14 @@ function cdrCost(rank: RankValue, prestige: number): number {
   return Math.floor(15 * effectiveRank * prestigeMulti);
 }
 
-export function shouldRun(command: Command, { potatoes, rank, prestige }: { potatoes: number; rank: RankValue; prestige: number }): boolean {
+export function shouldRun(
+  command: Command,
+  {
+    potatoes,
+    rank,
+    prestige,
+  }: { potatoes: number; rank: RankValue; prestige: number },
+): boolean {
   if (command === Actions.CDR) {
     // 100 potato buffer on top of the cost
     return potatoes >= cdrCost(rank, prestige) + 100;

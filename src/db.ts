@@ -1,5 +1,9 @@
 import { mkdirSync } from "node:fs";
-import { DatabaseSync, type SQLInputValue, type StatementSync } from "node:sqlite";
+import {
+  DatabaseSync,
+  type SQLInputValue,
+  type StatementSync,
+} from "node:sqlite";
 
 export interface StatsRow {
   farm: number;
@@ -149,8 +153,12 @@ export function initDb(): void {
       prestiges        = prestiges        + excluded.prestiges
   `);
 
-  getTotalsStmt = db.prepare("SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges FROM totals WHERE id = 1");
-  getDailyStmt = db.prepare("SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges FROM daily WHERE date = ?");
+  getTotalsStmt = db.prepare(
+    "SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges FROM totals WHERE id = 1",
+  );
+  getDailyStmt = db.prepare(
+    "SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges FROM daily WHERE date = ?",
+  );
   getWeekStmt = db.prepare(`
     SELECT
       COALESCE(SUM(farm), 0)             AS farm,
@@ -177,10 +185,14 @@ export function initDb(): void {
   cache.totals = (getTotalsStmt.get() as unknown as StatsRow | undefined) ?? {
     ...ZERO_STATS,
   };
-  cache.today = (getDailyStmt.get(todayStr()) as unknown as StatsRow | undefined) ?? {
+  cache.today = (getDailyStmt.get(todayStr()) as unknown as
+    | StatsRow
+    | undefined) ?? {
     ...ZERO_STATS,
   };
-  cache.week = (getWeekStmt.get(weekStartStr()) as unknown as StatsRow | undefined) ?? {
+  cache.week = (getWeekStmt.get(weekStartStr()) as unknown as
+    | StatsRow
+    | undefined) ?? {
     ...ZERO_STATS,
   };
   lastRecordDate = todayStr();
@@ -197,7 +209,9 @@ export function record(d: StatsRow): void {
   if (date !== lastRecordDate) {
     lastRecordDate = date;
     cache.today = { ...ZERO_STATS };
-    cache.week = (getWeekStmt.get(weekStartStr()) as unknown as StatsRow | undefined) ?? {
+    cache.week = (getWeekStmt.get(weekStartStr()) as unknown as
+      | StatsRow
+      | undefined) ?? {
       ...ZERO_STATS,
     };
   }
