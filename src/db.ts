@@ -1,9 +1,5 @@
 import { mkdirSync } from "node:fs";
-import {
-  DatabaseSync,
-  type SQLInputValue,
-  type StatementSync,
-} from "node:sqlite";
+import { DatabaseSync, type SQLInputValue, type StatementSync } from "node:sqlite";
 
 export interface StatsRow {
   farm: number;
@@ -14,6 +10,25 @@ export interface StatsRow {
   stealSuccesses: number;
   rankups: number;
   prestiges: number;
+}
+
+export interface BalanceEvent {
+  id: number;
+  executedAt: string;
+  command: string;
+  category: string;
+  delta: number;
+  balanceAfter: number;
+  responseText: string;
+}
+
+export interface NewBalanceEvent {
+  executedAt: string;
+  command: string;
+  category: string;
+  delta: number;
+  balanceAfter: number;
+  responseText: string;
 }
 
 export const ZERO_STATS: StatsRow = {
@@ -34,6 +49,8 @@ let upsertDaily!: StatementSync;
 let getTotalsStmt!: StatementSync;
 let getDailyStmt!: StatementSync;
 let getWeekStmt!: StatementSync;
+let insertBalanceEventStmt!: StatementSync;
+let getBalanceEventsStmt!: StatementSync;
 
 export const cache: { totals: StatsRow; today: StatsRow; week: StatsRow } = {
   totals: { ...ZERO_STATS },
@@ -89,6 +106,20 @@ export function initDb(): void {
       rankups          INTEGER NOT NULL DEFAULT 0,
       prestiges        INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS balance_events (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      executedAt       TEXT    NOT NULL,
+      command          TEXT    NOT NULL,
+      category         TEXT    NOT NULL,
+      delta            INTEGER NOT NULL,
+      balanceAfter     INTEGER NOT NULL,
+      responseText     TEXT    NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_balance_events_executedAt
+      ON balance_events (executedAt);
+    CREATE INDEX IF NOT EXISTS idx_balance_events_category_executedAt
+      ON balance_events (category, executedAt);
   `);
 
   updateTotals = db.prepare(`
@@ -118,12 +149,8 @@ export function initDb(): void {
       prestiges        = prestiges        + excluded.prestiges
   `);
 
-  getTotalsStmt = db.prepare(
-    "SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges FROM totals WHERE id = 1",
-  );
-  getDailyStmt = db.prepare(
-    "SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges FROM daily WHERE date = ?",
-  );
+  getTotalsStmt = db.prepare("SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges FROM totals WHERE id = 1");
+  getDailyStmt = db.prepare("SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges FROM daily WHERE date = ?");
   getWeekStmt = db.prepare(`
     SELECT
       COALESCE(SUM(farm), 0)             AS farm,
@@ -136,18 +163,24 @@ export function initDb(): void {
       COALESCE(SUM(prestiges), 0)        AS prestiges
     FROM daily WHERE date >= ?
   `);
+  insertBalanceEventStmt = db.prepare(`
+    INSERT INTO balance_events (executedAt, command, category, delta, balanceAfter, responseText)
+    VALUES (@executedAt, @command, @category, @delta, @balanceAfter, @responseText)
+  `);
+  getBalanceEventsStmt = db.prepare(`
+    SELECT id, executedAt, command, category, delta, balanceAfter, responseText
+    FROM balance_events
+    WHERE executedAt >= ? AND executedAt <= ?
+    ORDER BY executedAt ASC, id ASC
+  `);
 
   cache.totals = (getTotalsStmt.get() as unknown as StatsRow | undefined) ?? {
     ...ZERO_STATS,
   };
-  cache.today = (getDailyStmt.get(todayStr()) as unknown as
-    | StatsRow
-    | undefined) ?? {
+  cache.today = (getDailyStmt.get(todayStr()) as unknown as StatsRow | undefined) ?? {
     ...ZERO_STATS,
   };
-  cache.week = (getWeekStmt.get(weekStartStr()) as unknown as
-    | StatsRow
-    | undefined) ?? {
+  cache.week = (getWeekStmt.get(weekStartStr()) as unknown as StatsRow | undefined) ?? {
     ...ZERO_STATS,
   };
   lastRecordDate = todayStr();
@@ -164,13 +197,19 @@ export function record(d: StatsRow): void {
   if (date !== lastRecordDate) {
     lastRecordDate = date;
     cache.today = { ...ZERO_STATS };
-    cache.week = (getWeekStmt.get(weekStartStr()) as unknown as
-      | StatsRow
-      | undefined) ?? {
+    cache.week = (getWeekStmt.get(weekStartStr()) as unknown as StatsRow | undefined) ?? {
       ...ZERO_STATS,
     };
   }
   addToStats(cache.totals, d);
   addToStats(cache.today, d);
   addToStats(cache.week, d);
+}
+
+export function recordBalanceChange(event: NewBalanceEvent): void {
+  insertBalanceEventStmt.run(event as unknown as Record<string, SQLInputValue>);
+}
+
+export function getBalanceEvents(from: string, to: string): BalanceEvent[] {
+  return getBalanceEventsStmt.all(from, to) as unknown as BalanceEvent[];
 }

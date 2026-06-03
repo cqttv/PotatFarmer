@@ -3,21 +3,8 @@ import type { Server } from "node:http";
 import { sendCommand, fetchRank } from "./api.js";
 import { initDb, closeDb } from "./db.js";
 import { startServer } from "./http.js";
-import {
-  Actions,
-  LevelsPlan,
-  ShoppingPlan,
-  FarmPlan,
-  shouldRun,
-  type CommandPlan,
-} from "./plans.js";
-import {
-  displayStats,
-  playerInfo,
-  recordCommandResult,
-  setLastCommand,
-  updateFromRank,
-} from "./stats.js";
+import { Actions, LevelsPlan, ShoppingPlan, FarmPlan, shouldRun, type CommandPlan } from "./plans.js";
+import { displayStats, playerInfo, recordCommandResult, setLastCommand, updateFromRank } from "./stats.js";
 import { WEB_DASHBOARD_ENABLED, BOT_PREFIX } from "./utils/config.js";
 import { MINUTE_MS } from "./utils/constants.js";
 import { sleep } from "./utils/sleep.js";
@@ -63,11 +50,7 @@ async function runPlan(plan: CommandPlan): Promise<void> {
       recordCommandResult(step.command, result.text, result.isError);
 
       // Prestige zeros your balance, re-fetch immediately
-      if (
-        step.command === Actions.PRESTIGE &&
-        !result.isError &&
-        result.text !== null
-      ) {
+      if (step.command === Actions.PRESTIGE && !result.isError && result.text !== null) {
         await refreshRank();
       }
     } catch (err) {

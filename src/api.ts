@@ -32,9 +32,7 @@ export async function sendCommand(command: string): Promise<CommandResult> {
 
   const data = (await response.json()) as ApiResponse;
   if (data.statusCode !== 200) {
-    throw new Error(
-      data.errors?.map((e) => e.message).join("; ") ?? "Unknown error",
-    );
+    throw new Error(data.errors?.map((e) => e.message).join("; ") ?? "Unknown error");
   }
 
   const [resp] = Array.isArray(data.data) ? data.data : [data.data];

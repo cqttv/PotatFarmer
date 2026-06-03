@@ -1,5 +1,5 @@
 import { Actions, Rank, type RankValue } from "./plans.js";
-import { record, cache, ZERO_STATS, type StatsRow } from "./db.js";
+import { record, recordBalanceChange, cache, ZERO_STATS, type StatsRow } from "./db.js";
 
 const ANSI = {
   reset: "\x1b[0m",
@@ -68,8 +68,7 @@ export function updateFromRank(text: string): void {
   if (prestige) playerInfo.prestige = parseInt(prestige, 10);
   if (harvests) playerInfo.harvests = parseInt(harvests.replace(/,/g, ""), 10);
   if (steals) playerInfo.steals = parseInt(steals.replace(/,/g, ""), 10);
-  if (stolenFrom)
-    playerInfo.stolenFrom = parseInt(stolenFrom.replace(/,/g, ""), 10);
+  if (stolenFrom) playerInfo.stolenFrom = parseInt(stolenFrom.replace(/,/g, ""), 10);
   if (farmSize) {
     const trimmed = farmSize.trim();
     playerInfo.farmSize = trimmed;
@@ -83,13 +82,28 @@ export function updateFromRank(text: string): void {
 }
 
 // Matches the "[+N ⇒ total]" pattern in farm/steal/cdr/shop replies.
-const BALANCE_REGEX = /\[[+-][\d,]+\s*⇒\s*(-?[\d,]+)\]/;
+const BALANCE_REGEX = /\[([+-])([\d,]+)\s*⇒\s*(-?[\d,]+)\]/;
+
+interface BalanceChange {
+  delta: number;
+  balanceAfter: number;
+}
+
+function parseBalanceChange(text: string): BalanceChange | null {
+  const match = text.match(BALANCE_REGEX);
+  if (!match?.[1] || !match[2] || !match[3]) return null;
+  const sign = match[1] === "+" ? 1 : -1;
+  return {
+    delta: sign * parseInt(match[2].replace(/,/g, ""), 10),
+    balanceAfter: parseInt(match[3].replace(/,/g, ""), 10),
+  };
+}
 
 /** Pulls the running potato total out of a bot reply if one is present. */
 export function updateBalanceFromResponse(text: string): void {
-  const match = text.match(BALANCE_REGEX);
-  if (!match?.[1]) return;
-  playerInfo.potatoes = parseInt(match[1].replace(/,/g, ""), 10);
+  const change = parseBalanceChange(text);
+  if (!change) return;
+  playerInfo.potatoes = change.balanceAfter;
 }
 
 export function setLastCommand(command: string): void {
@@ -101,35 +115,28 @@ const CLEAR_SEQ = "\x1Bc";
 export const sessionTotals: StatsRow = { ...ZERO_STATS };
 export const sessionStart = Date.now();
 
-const TRACKED_COMMANDS: ReadonlySet<string> = new Set([
-  Actions.FARM,
-  Actions.STEAL,
-  Actions.RANKUP,
-  Actions.PRESTIGE,
-]);
+const TRACKED_COMMANDS: ReadonlySet<string> = new Set([Actions.FARM, Actions.STEAL, Actions.RANKUP, Actions.PRESTIGE]);
 
-function parseDelta(
-  command: string,
-  responseText: string,
-  isError: boolean,
-): number {
+function balanceCategory(command: string): string {
+  const normalized = command.toLowerCase();
+  if (command === Actions.STEAL) return "steal";
+  if (command === Actions.FARM) return "harvest";
+  if (command === Actions.CDR || normalized.includes("cooldown") || command.startsWith("shop ")) return "shop_cdr";
+  return "other";
+}
+
+function parseDelta(command: string, responseText: string, isError: boolean): number {
   if (isError) return 0;
   if (command !== Actions.FARM && command !== Actions.STEAL) return 0;
 
   const bracketMatch = responseText.match(/\[([+-])([\d,]+)/);
   if (bracketMatch?.[1] && bracketMatch[2]) {
-    return (
-      (bracketMatch[1] === "+" ? 1 : -1) *
-      parseInt(bracketMatch[2].replace(/,/g, ""), 10)
-    );
+    return (bracketMatch[1] === "+" ? 1 : -1) * parseInt(bracketMatch[2].replace(/,/g, ""), 10);
   }
 
   const potatoMatch = responseText.match(/([+-])\s*([\d,]+)\s*🥔/);
   if (potatoMatch?.[1] && potatoMatch[2]) {
-    return (
-      (potatoMatch[1] === "+" ? 1 : -1) *
-      parseInt(potatoMatch[2].replace(/,/g, ""), 10)
-    );
+    return (potatoMatch[1] === "+" ? 1 : -1) * parseInt(potatoMatch[2].replace(/,/g, ""), 10);
   }
 
   return 0;
@@ -137,17 +144,25 @@ function parseDelta(
 
 const COOLDOWN_REGEX = /✋⏰|aren'?t ready|not ready/i;
 
-export function recordCommandResult(
-  command: string,
-  responseText: string | null,
-  isError: boolean,
-): void {
-  if (responseText === null || COOLDOWN_REGEX.test(responseText)) return;
+export function recordCommandResult(command: string, responseText: string | null, isError: boolean): void {
+  if (responseText === null) return;
+  const balanceChange = parseBalanceChange(responseText);
+  if (balanceChange) {
+    playerInfo.potatoes = balanceChange.balanceAfter;
+    recordBalanceChange({
+      executedAt: new Date().toISOString(),
+      command,
+      category: balanceCategory(command),
+      delta: balanceChange.delta,
+      balanceAfter: balanceChange.balanceAfter,
+      responseText: responseText.slice(0, 500),
+    });
+  }
+  if (COOLDOWN_REGEX.test(responseText)) return;
   if (command === Actions.FARM && /♻⏰/.test(responseText)) return;
-  updateBalanceFromResponse(responseText);
   if (!TRACKED_COMMANDS.has(command)) return;
 
-  const delta = parseDelta(command, responseText, isError);
+  const delta = balanceChange?.delta ?? parseDelta(command, responseText, isError);
 
   const increment: StatsRow = {
     farm: command === Actions.FARM ? delta : 0,
@@ -223,12 +238,7 @@ function successRate(successes: number, attempts: number): string {
   return `${formatNumber(successes)} / ${formatNumber(attempts)}  (${pct}%)`;
 }
 
-function commandStatRow(
-  label: string,
-  successes: number,
-  attempts: number,
-  delta = 0,
-): string {
+function commandStatRow(label: string, successes: number, attempts: number, delta = 0): string {
   const rate = successRate(successes, attempts);
   const d = formatDelta(delta);
   const value = d ? `${rate}   ${deltaColor(delta)}${d}${ANSI.reset}` : rate;
@@ -238,35 +248,16 @@ function commandStatRow(
 function buildStatsRows(stats: StatsRow): string[] {
   const rows: string[] = [];
 
-  if (stats.farmAttempts > 0)
-    rows.push(
-      commandStatRow(
-        "Farm:",
-        stats.farmSuccesses,
-        stats.farmAttempts,
-        stats.farm,
-      ),
-    );
-  if (stats.stealAttempts > 0)
-    rows.push(
-      commandStatRow(
-        "Steal:",
-        stats.stealSuccesses,
-        stats.stealAttempts,
-        stats.steal,
-      ),
-    );
-  if (stats.rankups > 0)
-    rows.push(tableRow("Rank Ups:", formatNumber(stats.rankups), ANSI.cyan));
-  if (stats.prestiges > 0)
-    rows.push(tableRow("Prestiges:", formatNumber(stats.prestiges), ANSI.cyan));
+  if (stats.farmAttempts > 0) rows.push(commandStatRow("Farm:", stats.farmSuccesses, stats.farmAttempts, stats.farm));
+  if (stats.stealAttempts > 0) rows.push(commandStatRow("Steal:", stats.stealSuccesses, stats.stealAttempts, stats.steal));
+  if (stats.rankups > 0) rows.push(tableRow("Rank Ups:", formatNumber(stats.rankups), ANSI.cyan));
+  if (stats.prestiges > 0) rows.push(tableRow("Prestiges:", formatNumber(stats.prestiges), ANSI.cyan));
 
   if (rows.length === 0) {
     rows.push(tableRow("", "–", ANSI.dim));
   } else {
     const total = stats.farm + stats.steal;
-    if (total !== 0)
-      rows.push(tableRow("Total:", formatDelta(total), deltaColor(total)));
+    if (total !== 0) rows.push(tableRow("Total:", formatDelta(total), deltaColor(total)));
   }
 
   return rows;
@@ -284,39 +275,14 @@ export function displayStats(): void {
     `╔${"═".repeat(W)}╗`,
     `║${" ".repeat(leftPad)}${ANSI.bold}${ANSI.yellow}${title}${ANSI.reset}${" ".repeat(rightPad)}║`,
     divider(),
-    tableRow(
-      "User:",
-      isLoaded ? playerInfo.username : "Loading...",
-      isLoaded ? ANSI.bold : ANSI.dim,
-    ),
-    tableRow(
-      "Potatoes:",
-      isLoaded ? formatNumber(playerInfo.potatoes) : "Loading...",
-      playerInfo.potatoes < 0 ? ANSI.red : ANSI.green,
-    ),
-    tableRow(
-      "Prestige:",
-      isLoaded ? formatNumber(playerInfo.prestige) : "Loading...",
-    ),
+    tableRow("User:", isLoaded ? playerInfo.username : "Loading...", isLoaded ? ANSI.bold : ANSI.dim),
+    tableRow("Potatoes:", isLoaded ? formatNumber(playerInfo.potatoes) : "Loading...", playerInfo.potatoes < 0 ? ANSI.red : ANSI.green),
+    tableRow("Prestige:", isLoaded ? formatNumber(playerInfo.prestige) : "Loading..."),
     tableRow("Farm:", isLoaded ? playerInfo.farmSize : "Loading..."),
-    tableRow(
-      "Rank:",
-      isLoaded
-        ? `#${formatNumber(playerInfo.leaderboardRank)} / ${formatNumber(playerInfo.totalPlayers)}`
-        : "Loading...",
-    ),
-    tableRow(
-      "Harvests:",
-      isLoaded ? formatNumber(playerInfo.harvests) : "Loading...",
-    ),
-    tableRow(
-      "Steals:",
-      isLoaded ? formatNumber(playerInfo.steals) : "Loading...",
-    ),
-    tableRow(
-      "Stolen From:",
-      isLoaded ? formatNumber(playerInfo.stolenFrom) : "Loading...",
-    ),
+    tableRow("Rank:", isLoaded ? `#${formatNumber(playerInfo.leaderboardRank)} / ${formatNumber(playerInfo.totalPlayers)}` : "Loading..."),
+    tableRow("Harvests:", isLoaded ? formatNumber(playerInfo.harvests) : "Loading..."),
+    tableRow("Steals:", isLoaded ? formatNumber(playerInfo.steals) : "Loading..."),
+    tableRow("Stolen From:", isLoaded ? formatNumber(playerInfo.stolenFrom) : "Loading..."),
     sectionHeader(`Session  ${formatDuration(Date.now() - sessionStart)}`),
     ...buildStatsRows(sessionTotals),
     sectionHeader("Today"),
