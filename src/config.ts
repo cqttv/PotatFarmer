@@ -22,5 +22,5 @@ function parseEnvNumber(raw: string | undefined, defaultValue: number): number {
   if (trimmed === "") return defaultValue;
 
   const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : defaultValue;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultValue;
 }
