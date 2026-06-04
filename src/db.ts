@@ -63,7 +63,7 @@ export const cache: { totals: StatsRow; today: StatsRow; week: StatsRow } = {
 };
 let lastRecordDate = "";
 
-function addToStats(target: StatsRow, source: StatsRow): void {
+export function addToStats(target: StatsRow, source: StatsRow): void {
   for (const key of Object.keys(source) as (keyof StatsRow)[]) {
     // eslint-disable-next-line security/detect-object-injection
     target[key] += source[key];

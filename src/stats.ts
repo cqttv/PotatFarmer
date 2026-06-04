@@ -2,6 +2,7 @@ import { Actions, Rank, type RankValue } from "./plans.js";
 import {
   record,
   recordBalanceChange,
+  addToStats,
   cache,
   ZERO_STATS,
   type StatsRow,
@@ -197,10 +198,7 @@ export function recordCommandResult(
 
   record(increment);
 
-  for (const key of Object.keys(increment) as (keyof StatsRow)[]) {
-    // eslint-disable-next-line security/detect-object-injection
-    sessionTotals[key] += increment[key];
-  }
+  addToStats(sessionTotals, increment);
 }
 
 function formatNumber(n: number): string {
