@@ -1,4 +1,4 @@
-import { BEARER_TOKEN, API_URL, BOT_PREFIX } from "./utils/config.js";
+import { BEARER_TOKEN, API_URL, BOT_PREFIX } from "./config.js";
 import { Actions } from "./plans.js";
 
 export interface CommandResult {

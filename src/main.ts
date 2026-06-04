@@ -18,9 +18,7 @@ import {
   setLastCommand,
   updateFromRank,
 } from "./stats.js";
-import { WEB_DASHBOARD_ENABLED, BOT_PREFIX } from "./utils/config.js";
-import { MINUTE_MS } from "./utils/constants.js";
-import { sleep } from "./utils/sleep.js";
+import { WEB_DASHBOARD_ENABLED, BOT_PREFIX, PLAN_DELAY } from "./config.js";
 
 initDb();
 
@@ -29,6 +27,10 @@ let httpServer: Server | null = null;
 function shutdown(): void {
   if (httpServer) httpServer.close();
   closeDb();
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 const handleExit = (): void => {
@@ -91,7 +93,7 @@ async function run(): Promise<never> {
     await runPlan(ShoppingPlan);
     await runPlan(FarmPlan);
     await refreshRank();
-    await sleep(MINUTE_MS);
+    await sleep(PLAN_DELAY);
   }
 }
 

@@ -35,6 +35,16 @@ export interface NewBalanceEvent {
   responseText: string;
 }
 
+interface Queries {
+  updateTotals: StatementSync;
+  upsertDaily: StatementSync;
+  getTotals: StatementSync;
+  getDaily: StatementSync;
+  getWeek: StatementSync;
+  insertBalanceEvent: StatementSync;
+  getBalanceEvents: StatementSync;
+}
+
 export const ZERO_STATS: StatsRow = {
   farm: 0,
   farmAttempts: 0,
@@ -47,14 +57,7 @@ export const ZERO_STATS: StatsRow = {
 };
 
 let db!: DatabaseSync;
-
-let updateTotals!: StatementSync;
-let upsertDaily!: StatementSync;
-let getTotalsStmt!: StatementSync;
-let getDailyStmt!: StatementSync;
-let getWeekStmt!: StatementSync;
-let insertBalanceEventStmt!: StatementSync;
-let getBalanceEventsStmt!: StatementSync;
+let queries!: Queries;
 
 export const cache: { totals: StatsRow; today: StatsRow; week: StatsRow } = {
   totals: { ...ZERO_STATS },
@@ -63,7 +66,7 @@ export const cache: { totals: StatsRow; today: StatsRow; week: StatsRow } = {
 };
 let lastRecordDate = "";
 
-function addToStats(target: StatsRow, source: StatsRow): void {
+export function addToStats(target: StatsRow, source: StatsRow): void {
   for (const key of Object.keys(source) as (keyof StatsRow)[]) {
     // eslint-disable-next-line security/detect-object-injection
     target[key] += source[key];
@@ -83,6 +86,8 @@ function weekStartStr(): string {
 export function initDb(): void {
   mkdirSync("data", { recursive: true });
   db = new DatabaseSync("data/stats.db");
+  const today = todayStr();
+
   db.exec("PRAGMA journal_mode = WAL");
 
   db.exec(`
@@ -126,76 +131,78 @@ export function initDb(): void {
       ON balance_events (category, executedAt);
   `);
 
-  updateTotals = db.prepare(`
-    UPDATE totals SET
-      farm             = farm             + @farm,
-      farmAttempts     = farmAttempts     + @farmAttempts,
-      farmSuccesses    = farmSuccesses    + @farmSuccesses,
-      steal            = steal            + @steal,
-      stealAttempts    = stealAttempts    + @stealAttempts,
-      stealSuccesses   = stealSuccesses   + @stealSuccesses,
-      rankups          = rankups          + @rankups,
-      prestiges        = prestiges        + @prestiges
-    WHERE id = 1
-  `);
-
-  upsertDaily = db.prepare(`
-    INSERT INTO daily (date, farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges)
-    VALUES (@date, @farm, @farmAttempts, @farmSuccesses, @steal, @stealAttempts, @stealSuccesses, @rankups, @prestiges)
-    ON CONFLICT(date) DO UPDATE SET
-      farm             = farm             + excluded.farm,
-      farmAttempts     = farmAttempts     + excluded.farmAttempts,
-      farmSuccesses    = farmSuccesses    + excluded.farmSuccesses,
-      steal            = steal            + excluded.steal,
-      stealAttempts    = stealAttempts    + excluded.stealAttempts,
-      stealSuccesses   = stealSuccesses   + excluded.stealSuccesses,
-      rankups          = rankups          + excluded.rankups,
-      prestiges        = prestiges        + excluded.prestiges
-  `);
-
-  getTotalsStmt = db.prepare(
-    "SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges FROM totals WHERE id = 1",
-  );
-  getDailyStmt = db.prepare(
-    "SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges FROM daily WHERE date = ?",
-  );
-  getWeekStmt = db.prepare(`
-    SELECT
-      COALESCE(SUM(farm), 0)             AS farm,
-      COALESCE(SUM(farmAttempts), 0)     AS farmAttempts,
-      COALESCE(SUM(farmSuccesses), 0)    AS farmSuccesses,
-      COALESCE(SUM(steal), 0)            AS steal,
-      COALESCE(SUM(stealAttempts), 0)    AS stealAttempts,
-      COALESCE(SUM(stealSuccesses), 0)   AS stealSuccesses,
-      COALESCE(SUM(rankups), 0)          AS rankups,
-      COALESCE(SUM(prestiges), 0)        AS prestiges
-    FROM daily WHERE date >= ?
-  `);
-  insertBalanceEventStmt = db.prepare(`
-    INSERT INTO balance_events (executedAt, command, category, delta, balanceAfter, responseText)
-    VALUES (@executedAt, @command, @category, @delta, @balanceAfter, @responseText)
-  `);
-  getBalanceEventsStmt = db.prepare(`
-    SELECT id, executedAt, command, category, delta, balanceAfter, responseText
-    FROM balance_events
-    WHERE executedAt >= ? AND executedAt <= ?
-    ORDER BY executedAt ASC, id ASC
-  `);
-
-  cache.totals = (getTotalsStmt.get() as unknown as StatsRow | undefined) ?? {
-    ...ZERO_STATS,
+  queries = {
+    updateTotals: db.prepare(`
+      UPDATE totals SET
+        farm             = farm             + @farm,
+        farmAttempts     = farmAttempts     + @farmAttempts,
+        farmSuccesses    = farmSuccesses    + @farmSuccesses,
+        steal            = steal            + @steal,
+        stealAttempts    = stealAttempts    + @stealAttempts,
+        stealSuccesses   = stealSuccesses   + @stealSuccesses,
+        rankups          = rankups          + @rankups,
+        prestiges        = prestiges        + @prestiges
+      WHERE id = 1
+    `),
+    upsertDaily: db.prepare(`
+      INSERT INTO daily (date, farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges)
+      VALUES (@date, @farm, @farmAttempts, @farmSuccesses, @steal, @stealAttempts, @stealSuccesses, @rankups, @prestiges)
+      ON CONFLICT(date) DO UPDATE SET
+        farm             = farm             + excluded.farm,
+        farmAttempts     = farmAttempts     + excluded.farmAttempts,
+        farmSuccesses    = farmSuccesses    + excluded.farmSuccesses,
+        steal            = steal            + excluded.steal,
+        stealAttempts    = stealAttempts    + excluded.stealAttempts,
+        stealSuccesses   = stealSuccesses   + excluded.stealSuccesses,
+        rankups          = rankups          + excluded.rankups,
+        prestiges        = prestiges        + excluded.prestiges
+    `),
+    getTotals: db.prepare(
+      "SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges FROM totals WHERE id = 1",
+    ),
+    getDaily: db.prepare(
+      "SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges FROM daily WHERE date = ?",
+    ),
+    getWeek: db.prepare(`
+      SELECT
+        COALESCE(SUM(farm), 0)             AS farm,
+        COALESCE(SUM(farmAttempts), 0)     AS farmAttempts,
+        COALESCE(SUM(farmSuccesses), 0)    AS farmSuccesses,
+        COALESCE(SUM(steal), 0)            AS steal,
+        COALESCE(SUM(stealAttempts), 0)    AS stealAttempts,
+        COALESCE(SUM(stealSuccesses), 0)   AS stealSuccesses,
+        COALESCE(SUM(rankups), 0)          AS rankups,
+        COALESCE(SUM(prestiges), 0)        AS prestiges
+      FROM daily WHERE date >= ?
+    `),
+    insertBalanceEvent: db.prepare(`
+      INSERT INTO balance_events (executedAt, command, category, delta, balanceAfter, responseText)
+      VALUES (@executedAt, @command, @category, @delta, @balanceAfter, @responseText)
+    `),
+    getBalanceEvents: db.prepare(`
+      SELECT id, executedAt, command, category, delta, balanceAfter, responseText
+      FROM balance_events
+      WHERE executedAt >= ? AND executedAt <= ?
+      ORDER BY executedAt ASC, id ASC
+    `),
   };
-  cache.today = (getDailyStmt.get(todayStr()) as unknown as
+
+  cache.totals = (queries.getTotals.get() as unknown as
     | StatsRow
     | undefined) ?? {
     ...ZERO_STATS,
   };
-  cache.week = (getWeekStmt.get(weekStartStr()) as unknown as
+  cache.today = (queries.getDaily.get(today) as unknown as
     | StatsRow
     | undefined) ?? {
     ...ZERO_STATS,
   };
-  lastRecordDate = todayStr();
+  cache.week = (queries.getWeek.get(weekStartStr()) as unknown as
+    | StatsRow
+    | undefined) ?? {
+    ...ZERO_STATS,
+  };
+  lastRecordDate = today;
 }
 
 export function closeDb(): void {
@@ -204,12 +211,15 @@ export function closeDb(): void {
 
 export function record(d: StatsRow): void {
   const date = todayStr();
-  updateTotals.run(d as unknown as Record<string, SQLInputValue>);
-  upsertDaily.run({ ...d, date } as unknown as Record<string, SQLInputValue>);
+  queries.updateTotals.run(d as unknown as Record<string, SQLInputValue>);
+  queries.upsertDaily.run({
+    ...d,
+    date,
+  } as unknown as Record<string, SQLInputValue>);
   if (date !== lastRecordDate) {
     lastRecordDate = date;
     cache.today = { ...ZERO_STATS };
-    cache.week = (getWeekStmt.get(weekStartStr()) as unknown as
+    cache.week = (queries.getWeek.get(weekStartStr()) as unknown as
       | StatsRow
       | undefined) ?? {
       ...ZERO_STATS,
@@ -221,9 +231,11 @@ export function record(d: StatsRow): void {
 }
 
 export function recordBalanceChange(event: NewBalanceEvent): void {
-  insertBalanceEventStmt.run(event as unknown as Record<string, SQLInputValue>);
+  queries.insertBalanceEvent.run(
+    event as unknown as Record<string, SQLInputValue>,
+  );
 }
 
 export function getBalanceEvents(from: string, to: string): BalanceEvent[] {
-  return getBalanceEventsStmt.all(from, to) as unknown as BalanceEvent[];
+  return queries.getBalanceEvents.all(from, to) as unknown as BalanceEvent[];
 }

@@ -1,4 +1,4 @@
-import { FIFTEEN_SECONDS_MS } from "./utils/constants.js";
+import { COMMAND_DELAY } from "./config.js";
 
 export const Actions = {
   FARM: "p",
@@ -26,6 +26,13 @@ export const Rank = {
 
 export type RankValue = (typeof Rank)[keyof typeof Rank];
 
+export interface PlanStep {
+  command: Command;
+  delay: number;
+}
+
+export type CommandPlan = PlanStep[];
+
 // cdr has no server-side rejection if you can't afford it, cost is floor(15 * rank * (1 + prestige * 0.1))
 function cdrCost(rank: RankValue, prestige: number): number {
   const effectiveRank = rank !== Rank.Bankrupt ? rank : 5;
@@ -48,26 +55,19 @@ export function shouldRun(
   return true;
 }
 
-export interface PlanStep {
-  command: Command;
-  delay: number;
-}
-
-export type CommandPlan = PlanStep[];
-
 export const LevelsPlan: CommandPlan = [
-  { command: Actions.RANKUP, delay: FIFTEEN_SECONDS_MS },
-  { command: Actions.PRESTIGE, delay: FIFTEEN_SECONDS_MS },
+  { command: Actions.RANKUP, delay: COMMAND_DELAY },
+  { command: Actions.PRESTIGE, delay: COMMAND_DELAY },
 ];
 
 export const ShoppingPlan: CommandPlan = [
-  { command: Actions.SHOP_CDR, delay: FIFTEEN_SECONDS_MS },
-  { command: Actions.SHOP_GUARD, delay: FIFTEEN_SECONDS_MS },
-  { command: Actions.SHOP_FERTILIZER, delay: FIFTEEN_SECONDS_MS },
+  { command: Actions.SHOP_CDR, delay: COMMAND_DELAY },
+  { command: Actions.SHOP_GUARD, delay: COMMAND_DELAY },
+  { command: Actions.SHOP_FERTILIZER, delay: COMMAND_DELAY },
 ];
 
 export const FarmPlan: CommandPlan = [
-  { command: Actions.CDR, delay: FIFTEEN_SECONDS_MS },
-  { command: Actions.FARM, delay: FIFTEEN_SECONDS_MS },
-  { command: Actions.STEAL, delay: FIFTEEN_SECONDS_MS },
+  { command: Actions.CDR, delay: COMMAND_DELAY },
+  { command: Actions.FARM, delay: COMMAND_DELAY },
+  { command: Actions.STEAL, delay: COMMAND_DELAY },
 ];
