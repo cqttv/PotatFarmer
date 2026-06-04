@@ -26,6 +26,13 @@ export const Rank = {
 
 export type RankValue = (typeof Rank)[keyof typeof Rank];
 
+export interface PlanStep {
+  command: Command;
+  delay: number;
+}
+
+export type CommandPlan = PlanStep[];
+
 // cdr has no server-side rejection if you can't afford it, cost is floor(15 * rank * (1 + prestige * 0.1))
 function cdrCost(rank: RankValue, prestige: number): number {
   const effectiveRank = rank !== Rank.Bankrupt ? rank : 5;
@@ -47,13 +54,6 @@ export function shouldRun(
   }
   return true;
 }
-
-export interface PlanStep {
-  command: Command;
-  delay: number;
-}
-
-export type CommandPlan = PlanStep[];
 
 export const LevelsPlan: CommandPlan = [
   { command: Actions.RANKUP, delay: COMMAND_DELAY },

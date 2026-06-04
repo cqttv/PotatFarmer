@@ -8,20 +8,6 @@ import {
   type StatsRow,
 } from "./db.js";
 
-const ANSI = {
-  reset: "\x1b[0m",
-  bold: "\x1b[1m",
-  dim: "\x1b[2m",
-  red: "\x1b[31m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  cyan: "\x1b[36m",
-} as const;
-
-function getTermWidth(): number {
-  return Math.min((process.stdout.columns || 72) - 2, 90);
-}
-
 interface PlayerInfo {
   username: string;
   potatoes: number;
@@ -34,6 +20,25 @@ interface PlayerInfo {
   leaderboardRank: number;
   totalPlayers: number;
   lastCommand: string | null;
+}
+
+interface BalanceChange {
+  delta: number;
+  balanceAfter: number;
+}
+
+const ANSI = {
+  reset: "\x1b[0m",
+  bold: "\x1b[1m",
+  dim: "\x1b[2m",
+  red: "\x1b[31m",
+  green: "\x1b[32m",
+  yellow: "\x1b[33m",
+  cyan: "\x1b[36m",
+} as const;
+
+function getTermWidth(): number {
+  return Math.min((process.stdout.columns || 72) - 2, 90);
 }
 
 const RANK_BY_NAME = new Map<string, RankValue>([
@@ -91,11 +96,6 @@ export function updateFromRank(text: string): void {
 
 // Matches the "[+N ⇒ total]" pattern in farm/steal/cdr/shop replies.
 const BALANCE_REGEX = /\[([+-])([\d,]+)\s*⇒\s*(-?[\d,]+)\]/;
-
-interface BalanceChange {
-  delta: number;
-  balanceAfter: number;
-}
 
 function parseBalanceChange(text: string): BalanceChange | null {
   const match = text.match(BALANCE_REGEX);
