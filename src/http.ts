@@ -1,5 +1,4 @@
 import { createServer, type OutgoingHttpHeaders, type Server } from "node:http";
-import { URL } from "node:url";
 
 import { cache, getBalanceEvents } from "./db.js";
 import { playerInfo, sessionTotals, sessionStart } from "./stats.js";
@@ -117,10 +116,10 @@ function dur(ms) {
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' })
 const dateTimeFmt = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 const chartDefs = [
-  { id: 'overview', title: 'Overview', filter: e => true, mode: 'balance' },
-  { id: 'steal', title: 'Steal', filter: e => e.category === 'steal', mode: 'delta' },
-  { id: 'harvest', title: 'Potato / Harvest', filter: e => e.category === 'harvest', mode: 'delta' },
-  { id: 'shop', title: 'Shop & CDR', filter: e => e.category === 'shop_cdr' || e.command === 'cdr' || e.command.startsWith('shop ') || e.command.includes('cooldown'), mode: 'delta' },
+  { id: 'overview', filter: () => true, mode: 'balance' },
+  { id: 'steal', filter: e => e.category === 'steal', mode: 'delta' },
+  { id: 'harvest', filter: e => e.category === 'harvest', mode: 'delta' },
+  { id: 'shop', filter: e => e.category === 'shop_cdr', mode: 'delta' },
 ]
 let latestEvents = []
 let latestFrom = new Date(Date.now() - 86400000)

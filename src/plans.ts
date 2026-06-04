@@ -10,7 +10,6 @@ export const Actions = {
   RANKUP: "rankup",
   PRESTIGE: "prestige",
   RANK: "rank",
-  TRAMPLE: "trample",
 } as const;
 
 export type Command = (typeof Actions)[keyof typeof Actions];
@@ -27,8 +26,7 @@ export const Rank = {
 
 export type RankValue = (typeof Rank)[keyof typeof Rank];
 
-// cdr has no server-side rejection if you can't afford it — it just silently
-// goes negative. Cost is floor(15 * rank * (1 + prestige * 0.1)).
+// cdr has no server-side rejection if you can't afford it, cost is floor(15 * rank * (1 + prestige * 0.1))
 function cdrCost(rank: RankValue, prestige: number): number {
   const effectiveRank = rank !== Rank.Bankrupt ? rank : 5;
   const prestigeMulti = prestige >= 1 ? 1 + prestige * 0.1 : 1;

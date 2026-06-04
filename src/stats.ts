@@ -106,13 +106,6 @@ function parseBalanceChange(text: string): BalanceChange | null {
   };
 }
 
-/** Pulls the running potato total out of a bot reply if one is present. */
-export function updateBalanceFromResponse(text: string): void {
-  const change = parseBalanceChange(text);
-  if (!change) return;
-  playerInfo.potatoes = change.balanceAfter;
-}
-
 export function setLastCommand(command: string): void {
   playerInfo.lastCommand = command;
 }
@@ -130,15 +123,9 @@ const TRACKED_COMMANDS: ReadonlySet<string> = new Set([
 ]);
 
 function balanceCategory(command: string): string {
-  const normalized = command.toLowerCase();
   if (command === Actions.STEAL) return "steal";
   if (command === Actions.FARM) return "harvest";
-  if (
-    command === Actions.CDR ||
-    normalized.includes("cooldown") ||
-    command.startsWith("shop ")
-  )
-    return "shop_cdr";
+  if (command === Actions.CDR || command.startsWith("shop ")) return "shop_cdr";
   return "other";
 }
 
@@ -177,6 +164,9 @@ export function recordCommandResult(
   isError: boolean,
 ): void {
   if (responseText === null) return;
+  if (COOLDOWN_REGEX.test(responseText)) return;
+  if (command === Actions.FARM && /♻⏰/.test(responseText)) return;
+
   const balanceChange = parseBalanceChange(responseText);
   if (balanceChange) {
     playerInfo.potatoes = balanceChange.balanceAfter;
@@ -189,8 +179,6 @@ export function recordCommandResult(
       responseText: responseText.slice(0, 500),
     });
   }
-  if (COOLDOWN_REGEX.test(responseText)) return;
-  if (command === Actions.FARM && /♻⏰/.test(responseText)) return;
   if (!TRACKED_COMMANDS.has(command)) return;
 
   const delta =
