@@ -28,6 +28,7 @@ export default [
         NodeJS: "readonly",
         __dirname: "readonly",
         Buffer: "readonly",
+        URL: "readonly",
       },
     },
     plugins: {

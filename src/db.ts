@@ -16,6 +16,25 @@ export interface StatsRow {
   prestiges: number;
 }
 
+export interface BalanceEvent {
+  id: number;
+  executedAt: string;
+  command: string;
+  category: string;
+  delta: number;
+  balanceAfter: number;
+  responseText: string;
+}
+
+export interface NewBalanceEvent {
+  executedAt: string;
+  command: string;
+  category: string;
+  delta: number;
+  balanceAfter: number;
+  responseText: string;
+}
+
 export const ZERO_STATS: StatsRow = {
   farm: 0,
   farmAttempts: 0,
@@ -34,6 +53,8 @@ let upsertDaily!: StatementSync;
 let getTotalsStmt!: StatementSync;
 let getDailyStmt!: StatementSync;
 let getWeekStmt!: StatementSync;
+let insertBalanceEventStmt!: StatementSync;
+let getBalanceEventsStmt!: StatementSync;
 
 export const cache: { totals: StatsRow; today: StatsRow; week: StatsRow } = {
   totals: { ...ZERO_STATS },
@@ -89,6 +110,20 @@ export function initDb(): void {
       rankups          INTEGER NOT NULL DEFAULT 0,
       prestiges        INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS balance_events (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      executedAt       TEXT    NOT NULL,
+      command          TEXT    NOT NULL,
+      category         TEXT    NOT NULL,
+      delta            INTEGER NOT NULL,
+      balanceAfter     INTEGER NOT NULL,
+      responseText     TEXT    NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_balance_events_executedAt
+      ON balance_events (executedAt);
+    CREATE INDEX IF NOT EXISTS idx_balance_events_category_executedAt
+      ON balance_events (category, executedAt);
   `);
 
   updateTotals = db.prepare(`
@@ -136,6 +171,16 @@ export function initDb(): void {
       COALESCE(SUM(prestiges), 0)        AS prestiges
     FROM daily WHERE date >= ?
   `);
+  insertBalanceEventStmt = db.prepare(`
+    INSERT INTO balance_events (executedAt, command, category, delta, balanceAfter, responseText)
+    VALUES (@executedAt, @command, @category, @delta, @balanceAfter, @responseText)
+  `);
+  getBalanceEventsStmt = db.prepare(`
+    SELECT id, executedAt, command, category, delta, balanceAfter, responseText
+    FROM balance_events
+    WHERE executedAt >= ? AND executedAt <= ?
+    ORDER BY executedAt ASC, id ASC
+  `);
 
   cache.totals = (getTotalsStmt.get() as unknown as StatsRow | undefined) ?? {
     ...ZERO_STATS,
@@ -173,4 +218,12 @@ export function record(d: StatsRow): void {
   addToStats(cache.totals, d);
   addToStats(cache.today, d);
   addToStats(cache.week, d);
+}
+
+export function recordBalanceChange(event: NewBalanceEvent): void {
+  insertBalanceEventStmt.run(event as unknown as Record<string, SQLInputValue>);
+}
+
+export function getBalanceEvents(from: string, to: string): BalanceEvent[] {
+  return getBalanceEventsStmt.all(from, to) as unknown as BalanceEvent[];
 }

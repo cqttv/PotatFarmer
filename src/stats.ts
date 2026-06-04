@@ -1,5 +1,11 @@
 import { Actions, Rank, type RankValue } from "./plans.js";
-import { record, cache, ZERO_STATS, type StatsRow } from "./db.js";
+import {
+  record,
+  recordBalanceChange,
+  cache,
+  ZERO_STATS,
+  type StatsRow,
+} from "./db.js";
 
 const ANSI = {
   reset: "\x1b[0m",
@@ -83,13 +89,21 @@ export function updateFromRank(text: string): void {
 }
 
 // Matches the "[+N ⇒ total]" pattern in farm/steal/cdr/shop replies.
-const BALANCE_REGEX = /\[[+-][\d,]+\s*⇒\s*(-?[\d,]+)\]/;
+const BALANCE_REGEX = /\[([+-])([\d,]+)\s*⇒\s*(-?[\d,]+)\]/;
 
-/** Pulls the running potato total out of a bot reply if one is present. */
-export function updateBalanceFromResponse(text: string): void {
+interface BalanceChange {
+  delta: number;
+  balanceAfter: number;
+}
+
+function parseBalanceChange(text: string): BalanceChange | null {
   const match = text.match(BALANCE_REGEX);
-  if (!match?.[1]) return;
-  playerInfo.potatoes = parseInt(match[1].replace(/,/g, ""), 10);
+  if (!match?.[1] || !match[2] || !match[3]) return null;
+  const sign = match[1] === "+" ? 1 : -1;
+  return {
+    delta: sign * parseInt(match[2].replace(/,/g, ""), 10),
+    balanceAfter: parseInt(match[3].replace(/,/g, ""), 10),
+  };
 }
 
 export function setLastCommand(command: string): void {
@@ -107,6 +121,13 @@ const TRACKED_COMMANDS: ReadonlySet<string> = new Set([
   Actions.RANKUP,
   Actions.PRESTIGE,
 ]);
+
+function balanceCategory(command: string): string {
+  if (command === Actions.STEAL) return "steal";
+  if (command === Actions.FARM) return "harvest";
+  if (command === Actions.CDR || command.startsWith("shop ")) return "shop_cdr";
+  return "other";
+}
 
 function parseDelta(
   command: string,
@@ -142,12 +163,26 @@ export function recordCommandResult(
   responseText: string | null,
   isError: boolean,
 ): void {
-  if (responseText === null || COOLDOWN_REGEX.test(responseText)) return;
+  if (responseText === null) return;
+  if (COOLDOWN_REGEX.test(responseText)) return;
   if (command === Actions.FARM && /♻⏰/.test(responseText)) return;
-  updateBalanceFromResponse(responseText);
+
+  const balanceChange = parseBalanceChange(responseText);
+  if (balanceChange) {
+    playerInfo.potatoes = balanceChange.balanceAfter;
+    recordBalanceChange({
+      executedAt: new Date().toISOString(),
+      command,
+      category: balanceCategory(command),
+      delta: balanceChange.delta,
+      balanceAfter: balanceChange.balanceAfter,
+      responseText: responseText.slice(0, 500),
+    });
+  }
   if (!TRACKED_COMMANDS.has(command)) return;
 
-  const delta = parseDelta(command, responseText, isError);
+  const delta =
+    balanceChange?.delta ?? parseDelta(command, responseText, isError);
 
   const increment: StatsRow = {
     farm: command === Actions.FARM ? delta : 0,
