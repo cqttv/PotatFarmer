@@ -63,7 +63,7 @@ export const LevelsPlan: CommandPlan = [
 export const ShoppingPlan: CommandPlan = [
   { command: Actions.SHOP_CDR, delay: COMMAND_DELAY },
   { command: Actions.SHOP_GUARD, delay: COMMAND_DELAY },
-  { command: Actions.SHOP_FERTILIZER, delay: COMMAND_DELAY  },
+  { command: Actions.SHOP_FERTILIZER, delay: COMMAND_DELAY },
 ];
 
 export const FarmPlan: CommandPlan = [
