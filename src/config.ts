@@ -9,3 +9,5 @@ export const BOT_PREFIX = process.env["BOT_PREFIX"] ?? "#";
 export const WEB_PORT = parseInt(process.env["WEB_PORT"] ?? "3000", 10);
 export const WEB_DASHBOARD_ENABLED =
   process.env["WEB_DASHBOARD_ENABLED"] !== "false";
+export const COMMAND_DELAY = parseInt(process.env["COMMAND_DELAY"] ?? "15_000");
+export const PLAN_DELAY = parseInt(process.env["PLAN_DELAY"] ?? "60_000");

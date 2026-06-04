@@ -2,7 +2,7 @@ import { createServer, type OutgoingHttpHeaders, type Server } from "node:http";
 
 import { cache, getBalanceEvents } from "./db.js";
 import { playerInfo, sessionTotals, sessionStart } from "./stats.js";
-import { WEB_PORT } from "./utils/config.js";
+import { WEB_PORT } from "./config.js";
 
 const JSON_HEADERS: OutgoingHttpHeaders = {
   "Content-Type": "application/json",
