@@ -18,7 +18,12 @@ import {
   setLastCommand,
   updateFromRank,
 } from "./stats.js";
-import { WEB_DASHBOARD_ENABLED, BOT_PREFIX, PLAN_DELAY } from "./config.js";
+import {
+  WEB_DASHBOARD_ENABLED,
+  CONSOLE_STATS_ENABLED,
+  BOT_PREFIX,
+  PLAN_DELAY,
+} from "./config.js";
 
 initDb();
 
@@ -98,4 +103,5 @@ async function run(): Promise<never> {
 }
 
 if (WEB_DASHBOARD_ENABLED) httpServer = startServer();
-await Promise.all([run(), runDisplay()]);
+if (CONSOLE_STATS_ENABLED) void runDisplay();
+await run();

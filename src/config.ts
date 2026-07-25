@@ -8,6 +8,8 @@ export const API_URL =
 export const BOT_PREFIX = process.env["BOT_PREFIX"] ?? "#";
 export const WEB_DASHBOARD_ENABLED =
   process.env["WEB_DASHBOARD_ENABLED"] !== "false";
+export const CONSOLE_STATS_ENABLED =
+  process.env["CONSOLE_STATS_ENABLED"] !== "false";
 export const WEB_PORT = parseEnvNumber(process.env["WEB_PORT"], 3000);
 export const COMMAND_DELAY = parseEnvNumber(
   process.env["COMMAND_DELAY"],
