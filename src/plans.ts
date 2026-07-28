@@ -6,6 +6,7 @@ export const Actions = {
   SHOP_CDR: "shop cdr",
   SHOP_GUARD: "shop guard",
   SHOP_FERTILIZER: "shop fertilizer",
+  EAT: "eat",
   STEAL: "steal",
   RANKUP: "rankup",
   PRESTIGE: "prestige",
@@ -68,6 +69,7 @@ export const ShoppingPlan: CommandPlan = [
 
 export const FarmPlan: CommandPlan = [
   { command: Actions.CDR, delay: COMMAND_DELAY },
+  { command: Actions.EAT, delay: COMMAND_DELAY },
   { command: Actions.FARM, delay: COMMAND_DELAY },
   { command: Actions.STEAL, delay: COMMAND_DELAY },
 ];
