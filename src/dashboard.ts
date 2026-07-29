@@ -3,6 +3,7 @@ export const DASHBOARD_HTML = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="/favicon.ico" type="image/png">
 <title>Potat Farmer</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box }
@@ -47,6 +48,8 @@ body { background:#0d0d0d; color:#ccc; font:13px/1.6 'Courier New',monospace; pa
     <div class="toolbar">
       <label>From <input id="from" type="datetime-local"></label>
       <label>To <input id="to" type="datetime-local"></label>
+      <button id="range1" type="button">1h</button>
+      <button id="range4" type="button">4h</button>
       <button id="range24" type="button">24h</button>
       <button id="range7" type="button">7d</button>
       <button id="apply" type="button">Apply</button>
@@ -105,25 +108,34 @@ function dur(ms) {
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' })
 const dateTimeFmt = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 const chartDefs = [
-  { id: 'overview', filter: () => true, mode: 'balance' },
-  { id: 'steal', filter: e => e.category === 'steal', mode: 'delta' },
-  { id: 'harvest', filter: e => e.category === 'harvest', mode: 'delta' },
-  { id: 'shop', filter: e => e.category === 'shop_cdr', mode: 'delta' },
+  { id: 'overview', title: 'Overview', filter: e => true, mode: 'balance', style: 'line' },
+  { id: 'steal', title: 'Steal', filter: e => e.category === 'steal', mode: 'delta', style: 'bar' },
+  { id: 'harvest', title: 'Potato / Harvest', filter: e => e.category === 'harvest', mode: 'delta', style: 'line' },
+  { id: 'shop', title: 'Shop & CDR', filter: e => e.category === 'shop_cdr' || e.command === 'cdr' || e.command === 'eat' || e.command.startsWith('shop ') || e.command.includes('cooldown'), mode: 'delta', style: 'bar' },
 ]
+const chartPad = { l: 58, r: 14, t: 16, b: 34 }
 let latestEvents = []
 let latestFrom = new Date(Date.now() - 86400000)
 let latestTo = new Date()
 let hover = null
+let liveRangeHours = 24
 function localInputValue(date) {
   const offsetMs = date.getTimezoneOffset() * 60000
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16)
 }
-function setRange(hours) {
+function updateRangeInputs(hours) {
   const to = new Date()
   const from = new Date(to.getTime() - hours * 3600000)
   document.getElementById('from').value = localInputValue(from)
   document.getElementById('to').value = localInputValue(to)
+}
+function setRange(hours) {
+  liveRangeHours = hours
+  updateRangeInputs(hours)
   refreshCharts()
+}
+function stopLiveRange() {
+  liveRangeHours = null
 }
 function inputDate(id) {
   const v = document.getElementById(id).value
@@ -160,6 +172,18 @@ function nearestPoint(points) {
   let best = null
   let bestDist = Infinity
   points.forEach(p => {
+    if (p.barW) {
+      const left = p.barX - 3, right = p.barX + p.barW + 3
+      const top = p.barY - 3, bottom = p.barY + p.barH + 3
+      if (hover.x >= left && hover.x <= right && hover.y >= top && hover.y <= bottom) {
+        const dist = Math.abs(p.px - hover.x)
+        if (dist < bestDist) {
+          best = p
+          bestDist = dist
+        }
+      }
+      return
+    }
     const dx = p.px - hover.x, dy = p.py - hover.y
     const dist = Math.sqrt(dx * dx + dy * dy)
     if (dist < bestDist) {
@@ -167,7 +191,12 @@ function nearestPoint(points) {
       bestDist = dist
     }
   })
-  return bestDist <= 12 ? best : null
+  return best && (best.barW || bestDist <= 12) ? best : null
+}
+function drawHoverLine(ctx, x, pad, ph) {
+  ctx.strokeStyle = '#777'
+  ctx.lineWidth = 1
+  ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + ph); ctx.stroke()
 }
 function redrawCharts() {
   hideTip()
@@ -185,7 +214,7 @@ function drawChart(def, events, from, to) {
   ctx.clearRect(0, 0, w, h)
   ctx.fillStyle = '#101010'
   ctx.fillRect(0, 0, w, h)
-  const pad = { l: 58, r: 14, t: 16, b: 34 }
+  const pad = chartPad
   const pw = Math.max(1, w - pad.l - pad.r), ph = Math.max(1, h - pad.t - pad.b)
   const points = events.filter(def.filter).map(e => ({
     t: new Date(e.executedAt).getTime(),
@@ -209,6 +238,8 @@ function drawChart(def, events, from, to) {
     const label = timeFmt.format(new Date(start + ((end - start) * i) / 3))
     ctx.fillText(label, Math.min(x, w - pad.r - 42), h - 12)
   }
+  const hoverX = hover ? Math.max(pad.l, Math.min(w - pad.r, x(hover.t))) : null
+  if (hoverX !== null) drawHoverLine(ctx, hoverX, pad, ph)
   if (points.length === 0) {
     ctx.fillStyle = '#444'
     ctx.textAlign = 'center'
@@ -237,32 +268,49 @@ function drawChart(def, events, from, to) {
   ctx.beginPath(); ctx.moveTo(pad.l, zy); ctx.lineTo(w - pad.r, zy); ctx.stroke()
   ctx.fillStyle = '#777'
   ctx.fillText('0', 8, zy + 4)
-  ctx.strokeStyle = def.mode === 'balance' ? '#ffdd33' : '#00cccc'
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  points.forEach((p, i) => {
-    const px = x(p.t), py = y(p.y)
-    if (i === 0) ctx.moveTo(px, py)
-    else ctx.lineTo(px, py)
-  })
-  ctx.stroke()
-  points.forEach(p => {
-    ctx.fillStyle = p.delta < 0 ? '#cc3333' : '#33cc33'
-    ctx.beginPath(); ctx.arc(p.px, p.py, 3, 0, Math.PI * 2); ctx.fill()
-  })
+  if (def.style === 'bar') {
+    const bw = Math.max(4, Math.min(18, pw / Math.max(points.length * 1.6, 12)))
+    points.forEach(p => {
+      const top = Math.min(p.py, zy)
+      const height = Math.max(1, Math.abs(p.py - zy))
+      p.barX = Math.max(pad.l, Math.min(w - pad.r - bw, p.px - bw / 2))
+      p.barY = top
+      p.barW = bw
+      p.barH = height
+      ctx.fillStyle = p.delta < 0 ? '#cc3333' : '#33cc33'
+      ctx.fillRect(p.barX, p.barY, p.barW, p.barH)
+    })
+  } else {
+    ctx.strokeStyle = def.mode === 'balance' ? '#ffdd33' : '#00cccc'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    points.forEach((p, i) => {
+      const px = x(p.t), py = y(p.y)
+      if (i === 0) ctx.moveTo(px, py)
+      else ctx.lineTo(px, py)
+    })
+    ctx.stroke()
+    points.forEach(p => {
+      ctx.fillStyle = p.delta < 0 ? '#cc3333' : '#33cc33'
+      ctx.beginPath(); ctx.arc(p.px, p.py, 3, 0, Math.PI * 2); ctx.fill()
+    })
+  }
+  if (hoverX !== null) drawHoverLine(ctx, hoverX, pad, ph)
   const active = hover?.id === def.id ? nearestPoint(points) : null
   if (active) {
-    ctx.strokeStyle = '#777'
-    ctx.lineWidth = 1
-    ctx.beginPath(); ctx.moveTo(active.px, pad.t); ctx.lineTo(active.px, pad.t + ph); ctx.stroke()
-    ctx.fillStyle = '#101010'
     ctx.strokeStyle = '#ffdd33'
     ctx.lineWidth = 2
-    ctx.beginPath(); ctx.arc(active.px, active.py, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+    if (active.barW) {
+      ctx.strokeRect(active.barX - 2, active.barY - 2, active.barW + 4, active.barH + 4)
+    } else {
+      ctx.fillStyle = '#101010'
+      ctx.beginPath(); ctx.arc(active.px, active.py, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+    }
     renderTip(active, canvas)
   }
 }
 async function refreshCharts() {
+  if (liveRangeHours !== null) updateRangeInputs(liveRangeHours)
   const from = inputDate('from') || new Date(Date.now() - 86400000)
   const to = inputDate('to') || new Date()
   const qs = '?from=' + encodeURIComponent(from.toISOString()) + '&to=' + encodeURIComponent(to.toISOString())
@@ -301,14 +349,25 @@ async function refresh() {
     document.getElementById('foot').textContent = 'error: ' + String(e)
   }
 }
+document.getElementById('range1').addEventListener('click', () => setRange(1))
+document.getElementById('range4').addEventListener('click', () => setRange(4))
 document.getElementById('range24').addEventListener('click', () => setRange(24))
 document.getElementById('range7').addEventListener('click', () => setRange(24 * 7))
-document.getElementById('apply').addEventListener('click', refreshCharts)
+document.getElementById('from').addEventListener('input', stopLiveRange)
+document.getElementById('to').addEventListener('input', stopLiveRange)
+document.getElementById('apply').addEventListener('click', () => {
+  stopLiveRange()
+  refreshCharts()
+})
 chartDefs.forEach(def => {
   const canvas = document.getElementById(def.id)
   canvas.addEventListener('mousemove', e => {
     const rect = canvas.getBoundingClientRect()
-    hover = { id: def.id, x: e.clientX - rect.left, y: e.clientY - rect.top }
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    const pw = Math.max(1, rect.width - chartPad.l - chartPad.r)
+    const ratio = Math.max(0, Math.min(1, (x - chartPad.l) / pw))
+    hover = { id: def.id, x, y, t: latestFrom.getTime() + (latestTo.getTime() - latestFrom.getTime()) * ratio }
     redrawCharts()
   })
   canvas.addEventListener('mouseleave', () => {
