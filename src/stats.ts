@@ -126,7 +126,7 @@ const TRACKED_COMMANDS: ReadonlySet<string> = new Set([
 function balanceCategory(command: string): string {
   if (command === Actions.STEAL) return "steal";
   if (command === Actions.FARM) return "harvest";
-  if (command === Actions.CDR || command.startsWith("shop ")) return "shop_cdr";
+  if (command === Actions.CDR || command === Actions.EAT || command.startsWith("shop ")) return "shop_cdr";
   return "other";
 }
 
