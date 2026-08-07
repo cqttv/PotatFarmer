@@ -19,7 +19,7 @@ export interface StatsRow {
   quizSuccesses: number;
   quizAnswerAttempts: number;
   quizCacheHits: number;
-  quizOpenAICalls: number;
+  quizApiCalls: number;
 }
 
 export interface BalanceEvent {
@@ -68,7 +68,7 @@ export const ZERO_STATS: StatsRow = {
   quizSuccesses: 0,
   quizAnswerAttempts: 0,
   quizCacheHits: 0,
-  quizOpenAICalls: 0,
+  quizApiCalls: 0,
 };
 
 let db!: DatabaseSync;
@@ -121,7 +121,7 @@ export function initDb(): void {
       quizSuccesses    INTEGER NOT NULL DEFAULT 0,
       quizAnswerAttempts INTEGER NOT NULL DEFAULT 0,
       quizCacheHits    INTEGER NOT NULL DEFAULT 0,
-      quizOpenAICalls  INTEGER NOT NULL DEFAULT 0
+      quizApiCalls  INTEGER NOT NULL DEFAULT 0
     );
     INSERT OR IGNORE INTO totals (id) VALUES (1);
 
@@ -140,7 +140,7 @@ export function initDb(): void {
       quizSuccesses    INTEGER NOT NULL DEFAULT 0,
       quizAnswerAttempts INTEGER NOT NULL DEFAULT 0,
       quizCacheHits    INTEGER NOT NULL DEFAULT 0,
-      quizOpenAICalls  INTEGER NOT NULL DEFAULT 0
+      quizApiCalls  INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS balance_events (
@@ -167,17 +167,28 @@ export function initDb(): void {
   `);
 
   for (const table of ["totals", "daily"]) {
-    const columns = db
+    let columns = db
       .prepare(`PRAGMA table_info(${table})`)
       .all()
       .map((row) => (row as { name: string }).name);
+    if (
+      columns.includes("quizOpenAICalls") &&
+      !columns.includes("quizApiCalls")
+    ) {
+      db.exec(
+        `ALTER TABLE ${table} RENAME COLUMN quizOpenAICalls TO quizApiCalls`,
+      );
+      columns = columns.map((column) =>
+        column === "quizOpenAICalls" ? "quizApiCalls" : column,
+      );
+    }
     for (const column of [
       "quizReward",
       "quizAttempts",
       "quizSuccesses",
       "quizAnswerAttempts",
       "quizCacheHits",
-      "quizOpenAICalls",
+      "quizApiCalls",
     ]) {
       if (!columns.includes(column))
         db.exec(
@@ -202,12 +213,12 @@ export function initDb(): void {
         quizSuccesses    = quizSuccesses    + @quizSuccesses,
         quizAnswerAttempts = quizAnswerAttempts + @quizAnswerAttempts,
         quizCacheHits    = quizCacheHits    + @quizCacheHits,
-        quizOpenAICalls  = quizOpenAICalls  + @quizOpenAICalls
+        quizApiCalls  = quizApiCalls  + @quizApiCalls
       WHERE id = 1
     `),
     upsertDaily: db.prepare(`
-      INSERT INTO daily (date, farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges, quizReward, quizAttempts, quizSuccesses, quizAnswerAttempts, quizCacheHits, quizOpenAICalls)
-      VALUES (@date, @farm, @farmAttempts, @farmSuccesses, @steal, @stealAttempts, @stealSuccesses, @rankups, @prestiges, @quizReward, @quizAttempts, @quizSuccesses, @quizAnswerAttempts, @quizCacheHits, @quizOpenAICalls)
+      INSERT INTO daily (date, farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges, quizReward, quizAttempts, quizSuccesses, quizAnswerAttempts, quizCacheHits, quizApiCalls)
+      VALUES (@date, @farm, @farmAttempts, @farmSuccesses, @steal, @stealAttempts, @stealSuccesses, @rankups, @prestiges, @quizReward, @quizAttempts, @quizSuccesses, @quizAnswerAttempts, @quizCacheHits, @quizApiCalls)
       ON CONFLICT(date) DO UPDATE SET
         farm             = farm             + excluded.farm,
         farmAttempts     = farmAttempts     + excluded.farmAttempts,
@@ -222,13 +233,13 @@ export function initDb(): void {
         quizSuccesses    = quizSuccesses    + excluded.quizSuccesses,
         quizAnswerAttempts = quizAnswerAttempts + excluded.quizAnswerAttempts,
         quizCacheHits    = quizCacheHits    + excluded.quizCacheHits,
-        quizOpenAICalls  = quizOpenAICalls  + excluded.quizOpenAICalls
+        quizApiCalls  = quizApiCalls  + excluded.quizApiCalls
     `),
     getTotals: db.prepare(
-      "SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges, quizReward, quizAttempts, quizSuccesses, quizAnswerAttempts, quizCacheHits, quizOpenAICalls FROM totals WHERE id = 1",
+      "SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges, quizReward, quizAttempts, quizSuccesses, quizAnswerAttempts, quizCacheHits, quizApiCalls FROM totals WHERE id = 1",
     ),
     getDaily: db.prepare(
-      "SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges, quizReward, quizAttempts, quizSuccesses, quizAnswerAttempts, quizCacheHits, quizOpenAICalls FROM daily WHERE date = ?",
+      "SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges, quizReward, quizAttempts, quizSuccesses, quizAnswerAttempts, quizCacheHits, quizApiCalls FROM daily WHERE date = ?",
     ),
     getWeek: db.prepare(`
       SELECT
@@ -245,7 +256,7 @@ export function initDb(): void {
         COALESCE(SUM(quizSuccesses), 0)    AS quizSuccesses,
         COALESCE(SUM(quizAnswerAttempts), 0) AS quizAnswerAttempts,
         COALESCE(SUM(quizCacheHits), 0)    AS quizCacheHits,
-        COALESCE(SUM(quizOpenAICalls), 0)  AS quizOpenAICalls
+        COALESCE(SUM(quizApiCalls), 0)  AS quizApiCalls
       FROM daily WHERE date >= ?
     `),
     insertBalanceEvent: db.prepare(`

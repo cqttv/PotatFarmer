@@ -125,7 +125,7 @@ export function recordQuizStats(
       | "quizSuccesses"
       | "quizAnswerAttempts"
       | "quizCacheHits"
-      | "quizOpenAICalls"
+      | "quizApiCalls"
     >
   >,
 ): void {
@@ -222,7 +222,7 @@ export function recordCommandResult(
     quizSuccesses: 0,
     quizAnswerAttempts: 0,
     quizCacheHits: 0,
-    quizOpenAICalls: 0,
+    quizApiCalls: 0,
   };
 
   record(increment);
@@ -335,7 +335,7 @@ function buildStatsRows(stats: StatsRow): string[] {
     rows.push(
       tableRow(
         "Quiz Answers:",
-        `${formatNumber(stats.quizAnswerAttempts)}  (${formatNumber(stats.quizCacheHits)} cached, ${formatNumber(stats.quizOpenAICalls)} API)`,
+        `${formatNumber(stats.quizAnswerAttempts)}  (${formatNumber(stats.quizCacheHits)} cached, ${formatNumber(stats.quizApiCalls)} API)`,
       ),
     );
 

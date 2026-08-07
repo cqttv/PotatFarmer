@@ -102,7 +102,7 @@ function statRows(s) {
     out += row('Quizzes:', qv)
   }
   if (s.quizAnswerAttempts > 0) {
-    out += row('Quiz Answers:', fmt(s.quizAnswerAttempts) + ' (' + fmt(s.quizCacheHits) + ' cached, ' + fmt(s.quizOpenAICalls) + ' API)')
+    out += row('Quiz Answers:', fmt(s.quizAnswerAttempts) + ' (' + fmt(s.quizCacheHits) + ' cached, ' + fmt(s.quizApiCalls) + ' API)')
   }
   const total = s.farm + s.steal + s.quizReward
   if (total !== 0) out += row('Total:', delta(total), cls(total))

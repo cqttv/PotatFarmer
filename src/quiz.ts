@@ -4,9 +4,9 @@ import {
   sendCommand,
   type CommandResult,
 } from "./api.js";
+import { answerQuizQuestion } from "./ai.js";
 import { BOT_PREFIX, COMMAND_DELAY } from "./config.js";
 import { deleteQuizAnswer, getQuizAnswer, saveQuizAnswer } from "./db.js";
-import { answerQuizQuestion } from "./openai.js";
 import { Actions } from "./plans.js";
 import {
   playerInfo,
@@ -100,7 +100,7 @@ export async function runQuizPlan(): Promise<QuizResult> {
       answer = cachedAnswer;
       recordQuizStats({ quizCacheHits: 1 });
     } else {
-      recordQuizStats({ quizOpenAICalls: 1 });
+      recordQuizStats({ quizApiCalls: 1 });
       answer = await answerQuizQuestion(question, rejectedAnswers);
     }
     if (answer === null || rejectedAnswers.includes(answer)) {

@@ -4,8 +4,16 @@
 
 - Rename env.example to .env
 - Paste bearer token from potat.app
-- To enable automatic quizzes, add an OpenAI API key. Quizzes are enabled by
-  default when `OPENAI_API_KEY` is set; set `QUIZ_ENABLED=false` to disable them.
+- To enable automatic quizzes, set `AI_API_KEY` to an OpenAI, Gemini, or
+  DeepSeek API key and set `API_PROVIDER` to the matching provider. The provider
+  defaults to `openai`. Set `QUIZ_ENABLED=false` to disable automatic quizzes.
+
+Example:
+
+```env
+AI_API_KEY=your-api-key
+API_PROVIDER=gemini
+```
 
 ### How to use
 

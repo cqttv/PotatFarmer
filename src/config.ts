@@ -17,8 +17,19 @@ export const STATUS_INTERVAL = parseEnvNumber(
   30000,
 );
 export const QUIZ_ENABLED = process.env["QUIZ_ENABLED"] !== "false";
-export const OPENAI_API_KEY = process.env["OPENAI_API_KEY"]?.trim() ?? "";
-export const CAN_RUN_QUIZZES = QUIZ_ENABLED && OPENAI_API_KEY !== "";
+export const AI_API_KEY = process.env["AI_API_KEY"]?.trim() ?? "";
+export type AIProvider = "openai" | "gemini" | "deepseek";
+export const API_PROVIDER = parseAIProvider(process.env["API_PROVIDER"]);
+export const CAN_RUN_QUIZZES = QUIZ_ENABLED && AI_API_KEY !== "";
+
+function parseAIProvider(raw: string | undefined): AIProvider {
+  const provider = raw?.trim().toLowerCase() ?? "openai";
+  if (provider === "openai" || provider === "gemini" || provider === "deepseek")
+    return provider;
+  throw new Error(
+    `Unsupported API_PROVIDER ${JSON.stringify(raw)}; expected openai, gemini, or deepseek`,
+  );
+}
 
 function parseEnvNumber(raw: string | undefined, defaultValue: number): number {
   if (raw === undefined) return defaultValue;
