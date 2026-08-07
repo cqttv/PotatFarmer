@@ -135,7 +135,9 @@ async function executeCommand(command: Command): Promise<ExecutedCommand> {
 
   try {
     const result = await sendCommand(command);
-    if (result.text !== null) setLastCommand(`${BOT_PREFIX}${command}`);
+    if (result.text !== null && command !== Actions.STATUS) {
+      setLastCommand(`${BOT_PREFIX}${command}`);
+    }
     recordCommandResult(command, result.text, result.isError);
     if (
       (command === Actions.RANKUP || command === Actions.PRESTIGE) &&

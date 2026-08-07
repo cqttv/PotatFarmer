@@ -7,7 +7,7 @@
     "lint:fix": "eslint ./src --fix",
     "build": "tsdown",
     "type-check": "tsc --noEmit",
-    "start": "node --env-file=.env dist/main.mjs",
+    "start": "tsdown && node --env-file=.env dist/main.mjs",
     "start:dev": "npx tsx --env-file=.env src/main.ts",
     "start:pm2": "pm2 start dist/main.mjs --name PotatFarmer --node-args='--env-file=.env'"
   },
