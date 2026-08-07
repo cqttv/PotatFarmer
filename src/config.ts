@@ -25,7 +25,7 @@ export type LogLevel = "debug" | "info" | "warn" | "error";
 export const LOG_LEVEL = parseLogLevel(process.env["LOG_LEVEL"]);
 
 function parseLogLevel(raw: string | undefined): LogLevel {
-  const level = raw?.trim().toLowerCase() ?? "info";
+  const level = raw?.trim().toLowerCase() ?? "debug";
   if (
     level === "debug" ||
     level === "info" ||
