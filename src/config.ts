@@ -11,11 +11,11 @@ export const WEB_DASHBOARD_ENABLED =
 export const CONSOLE_STATS_ENABLED =
   process.env["CONSOLE_STATS_ENABLED"] !== "false";
 export const WEB_PORT = parseEnvNumber(process.env["WEB_PORT"], 3000);
-export const COMMAND_DELAY = parseEnvNumber(
-  process.env["COMMAND_DELAY"],
-  15000,
+export const COMMAND_DELAY = parseEnvNumber(process.env["COMMAND_DELAY"], 1000);
+export const STATUS_INTERVAL = parseEnvNumber(
+  process.env["STATUS_INTERVAL"] ?? process.env["PLAN_DELAY"],
+  30000,
 );
-export const PLAN_DELAY = parseEnvNumber(process.env["PLAN_DELAY"], 60000);
 export const QUIZ_ENABLED = process.env["QUIZ_ENABLED"] !== "false";
 export const OPENAI_API_KEY = process.env["OPENAI_API_KEY"]?.trim() ?? "";
 export const CAN_RUN_QUIZZES = QUIZ_ENABLED && OPENAI_API_KEY !== "";

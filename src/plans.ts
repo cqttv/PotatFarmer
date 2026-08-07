@@ -1,5 +1,3 @@
-import { COMMAND_DELAY } from "./config.js";
-
 export const Actions = {
   FARM: "p",
   CDR: "cdr",
@@ -14,6 +12,7 @@ export const Actions = {
   QUIZ: "quiz",
   ANSWER: "a",
   SHOP_QUIZ: "shop quiz",
+  STATUS: "status",
 } as const;
 
 export type Command = (typeof Actions)[keyof typeof Actions];
@@ -29,13 +28,6 @@ export const Rank = {
 } as const;
 
 export type RankValue = (typeof Rank)[keyof typeof Rank];
-
-export interface PlanStep {
-  command: Command;
-  delay: number;
-}
-
-export type CommandPlan = PlanStep[];
 
 // cdr has no server-side rejection if you can't afford it, cost is floor(15 * rank * (1 + prestige * 0.1))
 function cdrCost(rank: RankValue, prestige: number): number {
@@ -58,25 +50,3 @@ export function shouldRun(
   }
   return true;
 }
-
-export const LevelsPlan: CommandPlan = [
-  { command: Actions.RANKUP, delay: COMMAND_DELAY },
-  { command: Actions.PRESTIGE, delay: COMMAND_DELAY },
-];
-
-export const ShoppingPlan: CommandPlan = [
-  { command: Actions.SHOP_CDR, delay: COMMAND_DELAY },
-  { command: Actions.SHOP_GUARD, delay: COMMAND_DELAY },
-  { command: Actions.SHOP_FERTILIZER, delay: COMMAND_DELAY },
-];
-
-export const FarmPlan: CommandPlan = [
-  { command: Actions.CDR, delay: COMMAND_DELAY },
-  { command: Actions.EAT, delay: COMMAND_DELAY },
-  { command: Actions.FARM, delay: COMMAND_DELAY },
-  { command: Actions.STEAL, delay: COMMAND_DELAY },
-];
-
-export const QuizShoppingPlan: CommandPlan = [
-  { command: Actions.SHOP_QUIZ, delay: COMMAND_DELAY },
-];
