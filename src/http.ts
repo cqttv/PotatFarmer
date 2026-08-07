@@ -4,6 +4,7 @@ import { DASHBOARD_HTML } from "./dashboard.js";
 import { cache, getBalanceEvents } from "./db.js";
 import { playerInfo, sessionTotals, sessionStart } from "./stats.js";
 import { WEB_PORT } from "./config.js";
+import { log } from "./logger.js";
 
 const JSON_HEADERS: OutgoingHttpHeaders = {
   "Content-Type": "application/json",
@@ -19,12 +20,19 @@ const HTML_HEADERS: OutgoingHttpHeaders = {
 
 export function startServer(): Server {
   const server = createServer((req, res) => {
+    const startedAt = Date.now();
     const reqUrl = new URL(req.url ?? "/", "http://localhost");
     const url = reqUrl.pathname;
 
     if (req.method === "GET" && url === "/") {
       res.writeHead(200, HTML_HEADERS);
       res.end(HTML_BUF);
+      log.debug("HTTP request completed", {
+        method: req.method,
+        path: url,
+        status: 200,
+        durationMs: Date.now() - startedAt,
+      });
       return;
     }
 
@@ -38,6 +46,12 @@ export function startServer(): Server {
       });
       res.writeHead(200, JSON_HEADERS);
       res.end(body);
+      log.debug("HTTP request completed", {
+        method: req.method,
+        path: url,
+        status: 200,
+        durationMs: Date.now() - startedAt,
+      });
       return;
     }
 
@@ -49,22 +63,35 @@ export function startServer(): Server {
       const toMs = toParam ? Date.parse(toParam) : now;
       const from = new Date(Number.isNaN(fromMs) ? now - 86400000 : fromMs);
       const to = new Date(Number.isNaN(toMs) ? now : toMs);
-      const body = JSON.stringify({
-        events: getBalanceEvents(from.toISOString(), to.toISOString()),
-      });
+      const events = getBalanceEvents(from.toISOString(), to.toISOString());
+      const body = JSON.stringify({ events });
       res.writeHead(200, JSON_HEADERS);
       res.end(body);
+      log.debug("HTTP request completed", {
+        method: req.method,
+        path: url,
+        status: 200,
+        durationMs: Date.now() - startedAt,
+        eventCount: events.length,
+      });
       return;
     }
 
     res.writeHead(404, JSON_HEADERS);
     res.end('{"error":"not found"}');
+    log.warn("HTTP route not found", {
+      method: req.method,
+      path: url,
+      status: 404,
+    });
   });
 
   server.on("error", (err: Error) => {
-    process.stderr.write(`http server error: ${String(err)}\n`);
+    log.error("HTTP server error", err);
   });
 
-  server.listen(WEB_PORT);
+  server.listen(WEB_PORT, () => {
+    log.info("Dashboard server listening", { port: WEB_PORT });
+  });
   return server;
 }

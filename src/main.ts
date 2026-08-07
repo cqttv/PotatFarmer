@@ -12,6 +12,7 @@ import {
 import { initDb, closeDb } from "./db.js";
 import { startServer } from "./http.js";
 import { Actions, shouldRun, type Command } from "./plans.js";
+import { formatLogText, log } from "./logger.js";
 import { runQuizPlan } from "./quiz.js";
 import {
   displayStats,
@@ -26,6 +27,7 @@ initDb();
 let httpServer: Server | null = null;
 
 function shutdown(): void {
+  log.info("Shutting down");
   if (httpServer) httpServer.close();
   closeDb();
 }
@@ -41,17 +43,24 @@ const handleExit = (): void => {
 process.on("SIGINT", handleExit);
 process.on("SIGTERM", handleExit);
 process.on("unhandledRejection", (err) => {
-  process.stderr.write(`unhandledRejection: ${String(err)}\n`);
+  log.error("Unhandled promise rejection", err);
 });
 process.on("uncaughtException", (err: Error) => {
-  process.stderr.write(`uncaughtException: ${err.message}\n`);
+  log.error("Uncaught exception", err);
   shutdown();
   process.exit(1);
 });
 
 async function refreshRank(): Promise<void> {
   const text = await fetchRank();
-  if (text) updateFromRank(text);
+  if (text) {
+    updateFromRank(text);
+    log.debug("Player rank refreshed", {
+      rank: playerInfo.rank,
+      prestige: playerInfo.prestige,
+      potatoes: playerInfo.potatoes,
+    });
+  }
 }
 
 type StatusLabel =
@@ -125,6 +134,12 @@ interface ExecutedCommand {
 
 async function executeCommand(command: Command): Promise<ExecutedCommand> {
   if (!shouldRun(command, playerInfo)) {
+    log.info("Command skipped by plan guard", {
+      command,
+      potatoes: playerInfo.potatoes,
+      rank: playerInfo.rank,
+      prestige: playerInfo.prestige,
+    });
     return {
       succeeded: false,
       text: null,
@@ -134,6 +149,7 @@ async function executeCommand(command: Command): Promise<ExecutedCommand> {
   }
 
   try {
+    const startedAt = Date.now();
     const result = await sendCommand(command);
     if (result.text !== null && command !== Actions.STATUS) {
       setLastCommand(`${BOT_PREFIX}${command}`);
@@ -144,14 +160,22 @@ async function executeCommand(command: Command): Promise<ExecutedCommand> {
       !result.isError
     )
       await refreshRank();
-    return {
+    const executed = {
       succeeded: !result.isError && result.text !== null,
       text: result.text,
       rankupReady: hasReadyMarker(result.text, "rankup"),
       prestigeReady: hasReadyMarker(result.text, "prestige"),
     };
+    log.info("Command executed", {
+      command,
+      succeeded: executed.succeeded,
+      isError: result.isError,
+      durationMs: Date.now() - startedAt,
+      response: formatLogText(result.text),
+    });
+    return executed;
   } catch (err) {
-    process.stderr.write(`command "${command}": ${String(err)}\n`);
+    log.error("Command execution failed", err, { command });
     return {
       succeeded: false,
       text: null,
@@ -192,10 +216,17 @@ function buildQueueFromStatus(status: CooldownStatus): Command[] {
 }
 
 async function runStatusCycle(): Promise<void> {
+  const cycleStartedAt = Date.now();
+  log.debug("Starting status cycle");
   const statusResult = await executeCommand(Actions.STATUS);
-  if (!statusResult.succeeded || !statusResult.text) return;
+  if (!statusResult.succeeded || !statusResult.text) {
+    log.warn("Status cycle stopped without a usable status response");
+    return;
+  }
 
-  const queue = buildQueueFromStatus(parseStatus(statusResult.text));
+  const status = parseStatus(statusResult.text);
+  const queue = buildQueueFromStatus(status);
+  log.info("Status queue built", { status, queue });
   const queued = new Set<Command>(queue);
 
   const enqueue = (command: Command, next = false): void => {
@@ -203,6 +234,7 @@ async function runStatusCycle(): Promise<void> {
       queued.add(command);
       if (next) queue.splice(index + 1, 0, command);
       else queue.push(command);
+      log.debug("Command added to active queue", { command, next, queue });
     }
   };
 
@@ -215,6 +247,7 @@ async function runStatusCycle(): Promise<void> {
     let result: ExecutedCommand;
     if (command === Actions.QUIZ) {
       const quizResult = await runQuizPlan();
+      log.info("Quiz plan finished", { result: quizResult });
       result = {
         succeeded: quizResult === "completed",
         text: null,
@@ -238,8 +271,17 @@ async function runStatusCycle(): Promise<void> {
       enqueue(Actions.QUIZ, true);
 
     // Prestige resets all relevant cooldowns, so discard the stale queue.
-    if (result.succeeded && command === Actions.PRESTIGE) return;
+    if (result.succeeded && command === Actions.PRESTIGE) {
+      log.info("Status cycle ended after prestige", {
+        durationMs: Date.now() - cycleStartedAt,
+      });
+      return;
+    }
   }
+  log.debug("Status cycle completed", {
+    durationMs: Date.now() - cycleStartedAt,
+    commandsProcessed: queue.length,
+  });
 }
 
 async function runDisplay(): Promise<never> {
@@ -250,6 +292,13 @@ async function runDisplay(): Promise<never> {
 }
 
 async function run(): Promise<never> {
+  log.info("PotatFarmer started", {
+    statusIntervalMs: STATUS_INTERVAL,
+    commandDelayMs: COMMAND_DELAY,
+    quizzesEnabled: CAN_RUN_QUIZZES,
+    webDashboardEnabled: WEB_DASHBOARD_ENABLED,
+    consoleStatsEnabled: CONSOLE_STATS_ENABLED,
+  });
   await refreshRank();
   for (;;) {
     await runStatusCycle();

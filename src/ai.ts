@@ -1,4 +1,5 @@
 import { AI_API_KEY, API_PROVIDER, type AIProvider } from "./config.js";
+import { formatLogText, log } from "./logger.js";
 
 interface ChatCompletionResponse {
   choices?: { message?: { content?: string | null } }[];
@@ -65,6 +66,13 @@ export async function answerQuizQuestion(
       : `\nThe following previous answers were rejected and must not be repeated: ${rejectedAnswers.join(", ")}.`;
   // eslint-disable-next-line security/detect-object-injection
   const provider = PROVIDERS[API_PROVIDER];
+  const startedAt = Date.now();
+  log.debug("Requesting quiz answer", {
+    provider: API_PROVIDER,
+    model: provider.model,
+    question: formatLogText(question),
+    rejectedAnswers,
+  });
 
   try {
     const response = await fetch(provider.endpoint, {
@@ -79,23 +87,40 @@ export async function answerQuizQuestion(
 
     if (!response.ok) {
       const body = await response.text();
-      process.stderr.write(
-        `${API_PROVIDER} request failed (${response.status}): ${body.slice(0, 500)}\n`,
-      );
+      log.warn("Quiz answer request was rejected", {
+        provider: API_PROVIDER,
+        model: provider.model,
+        status: response.status,
+        durationMs: Date.now() - startedAt,
+        response: formatLogText(body, 500),
+      });
       return null;
     }
 
     const data = (await response.json()) as ChatCompletionResponse;
     const answer = data.choices?.[0]?.message?.content?.trim();
     if (!answer || !NUMBER_ONLY.test(answer)) {
-      process.stderr.write(
-        `${API_PROVIDER} returned an invalid quiz answer: ${JSON.stringify(answer)}\n`,
-      );
+      log.warn("Provider returned an invalid quiz answer", {
+        provider: API_PROVIDER,
+        model: provider.model,
+        durationMs: Date.now() - startedAt,
+        answer: formatLogText(answer ?? null),
+      });
       return null;
     }
+    log.info("Quiz answer received", {
+      provider: API_PROVIDER,
+      model: provider.model,
+      durationMs: Date.now() - startedAt,
+      answer,
+    });
     return answer;
   } catch (err) {
-    process.stderr.write(`${API_PROVIDER} quiz request: ${String(err)}\n`);
+    log.error("Quiz answer request failed", err, {
+      provider: API_PROVIDER,
+      model: provider.model,
+      durationMs: Date.now() - startedAt,
+    });
     return null;
   }
 }

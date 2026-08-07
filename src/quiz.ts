@@ -13,6 +13,7 @@ import {
   saveQuizAnswer,
 } from "./db.js";
 import { Actions } from "./plans.js";
+import { formatLogText, log } from "./logger.js";
 import {
   playerInfo,
   recordQuizStats,
@@ -29,6 +30,7 @@ const COOLDOWN =
 const INCORRECT = /incorrect answer/i;
 const TERMINAL_FAILURE = /expired|failed to answer|five attempts/i;
 const NO_RESULT = /didn'?t return any result/i;
+let quizSequence = 0;
 
 export type QuizResult = "completed" | "unavailable" | "failed";
 
@@ -44,14 +46,26 @@ function isCooldown(error: unknown): boolean {
   return error instanceof Error && COOLDOWN.test(error.message);
 }
 
-async function confirmQuizCompleted(): Promise<boolean> {
+async function confirmQuizCompleted(quizId: string): Promise<boolean> {
   // #a and #quiz share a five-second command cooldown.
   await sleep(Math.max(5_500, COMMAND_DELAY));
   try {
     const result = await sendCommand(Actions.QUIZ);
-    return result.text !== null && COOLDOWN.test(result.text);
+    const completed = result.text !== null && COOLDOWN.test(result.text);
+    log.info("Quiz completion check finished", {
+      quizId,
+      completed,
+      response: formatLogText(result.text),
+    });
+    return completed;
   } catch (err) {
-    return isCooldown(err);
+    const completed = isCooldown(err);
+    log.info("Quiz completion check returned an error", {
+      quizId,
+      completed,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return completed;
   }
 }
 
@@ -59,6 +73,7 @@ async function recordSuccess(
   questionKey: string,
   answer: string,
   balanceBefore: number,
+  quizId: string,
 ): Promise<void> {
   const rank = await fetchRank();
   if (rank) updateFromRank(rank);
@@ -75,24 +90,45 @@ async function recordSuccess(
   }
   saveQuizAnswer(questionKey, answer);
   recordQuizStats({ quizSuccesses: 1, quizReward: reward });
+  log.info("Quiz completed successfully", {
+    quizId,
+    answer,
+    reward,
+    balanceBefore,
+    balanceAfter: playerInfo.potatoes,
+  });
 }
 
 export async function runQuizPlan(): Promise<QuizResult> {
+  const quizId = `${Date.now().toString(36)}-${++quizSequence}`;
+  const startedAt = Date.now();
+  log.info("Starting quiz", { quizId });
   let started: CommandResult;
   try {
     started = await sendCommand(Actions.QUIZ);
   } catch (err) {
-    if (isCooldown(err)) return "unavailable";
-    process.stderr.write(`quiz start: ${String(err)}\n`);
+    if (isCooldown(err)) {
+      log.info("Quiz is on cooldown", { quizId });
+      return "unavailable";
+    }
+    log.error("Unable to start quiz", err, { quizId });
     return "failed";
   }
 
-  if (started.text === null || COOLDOWN.test(started.text))
+  if (started.text === null || COOLDOWN.test(started.text)) {
+    log.info("Quiz is unavailable", {
+      quizId,
+      response: formatLogText(started.text),
+    });
     return "unavailable";
+  }
 
   const question = started.text.replace(QUIZ_SUFFIX, "").trim();
   if (question === started.text.trim()) {
-    process.stderr.write(`Unable to parse quiz question: ${started.text}\n`);
+    log.warn("Unable to parse quiz question", {
+      quizId,
+      response: formatLogText(started.text, 500),
+    });
     return "failed";
   }
 
@@ -105,57 +141,131 @@ export async function runQuizPlan(): Promise<QuizResult> {
   const rejectedAnswers: string[] = [];
   const balanceBefore = playerInfo.potatoes;
   let answerAttempts = 0;
+  log.info("Quiz question parsed", {
+    quizId,
+    question: formatLogText(question, 500),
+    questionKey,
+    cacheHit: cachedAnswer !== null,
+    balanceBefore,
+    timeoutMs: QUIZ_TIMEOUT_MS,
+  });
 
   while (answerAttempts < MAX_ATTEMPTS) {
-    if (Date.now() >= deadline) return "failed";
+    if (Date.now() >= deadline) {
+      log.warn("Quiz deadline reached before selecting an answer", {
+        quizId,
+        answerAttempts,
+        durationMs: Date.now() - startedAt,
+      });
+      return "failed";
+    }
 
     const fromCache = answerAttempts === 0 && cachedAnswer !== null;
     let answer: string | null;
     if (fromCache) {
       answer = cachedAnswer;
       recordQuizStats({ quizCacheHits: 1 });
+      log.info("Using cached quiz answer", { quizId, answer });
     } else {
       recordQuizStats({ quizApiCalls: 1 });
+      log.debug("Requesting answer from AI", {
+        quizId,
+        rejectedAnswers,
+        answerAttempts,
+      });
       answer = await answerQuizQuestion(question, rejectedAnswers);
     }
     if (answer === null || rejectedAnswers.includes(answer)) {
+      log.warn("No usable quiz answer was produced", {
+        quizId,
+        answer,
+        alreadyRejected: answer !== null && rejectedAnswers.includes(answer),
+        rejectedAnswers,
+      });
       await sleep(1_000);
       continue;
     }
-    if (Date.now() >= deadline) return "failed";
+    if (Date.now() >= deadline) {
+      log.warn("Quiz deadline reached before submitting answer", {
+        quizId,
+        answer,
+        durationMs: Date.now() - startedAt,
+      });
+      return "failed";
+    }
 
     setLastCommand(`${BOT_PREFIX}${Actions.ANSWER} ${answer}`);
     answerAttempts += 1;
     recordQuizStats({ quizAnswerAttempts: 1 });
+    log.info("Submitting quiz answer", {
+      quizId,
+      answer,
+      attempt: answerAttempts,
+      source: fromCache ? "cache" : "ai",
+      remainingMs: deadline - Date.now(),
+    });
 
     try {
       const result = await sendCommand(`${Actions.ANSWER} ${answer}`);
       if (result.text && /that'?s right|congratulations/i.test(result.text)) {
-        await recordSuccess(questionKey, answer, balanceBefore);
+        await recordSuccess(questionKey, answer, balanceBefore, quizId);
         return "completed";
       }
+      log.warn("Quiz answer returned an unrecognized response", {
+        quizId,
+        answer,
+        attempt: answerAttempts,
+        response: formatLogText(result.text, 500),
+        isError: result.isError,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (
         err instanceof CommandError &&
         err.status === 404 &&
         NO_RESULT.test(message) &&
-        (await confirmQuizCompleted())
+        (await confirmQuizCompleted(quizId))
       ) {
-        await recordSuccess(questionKey, answer, balanceBefore);
+        await recordSuccess(questionKey, answer, balanceBefore, quizId);
         return "completed";
       }
       if (INCORRECT.test(message)) {
         rejectedAnswers.push(answer);
         if (fromCache) deleteQuizAnswer(questionKey, answer);
+        log.warn("Quiz answer was incorrect", {
+          quizId,
+          answer,
+          attempt: answerAttempts,
+          source: fromCache ? "cache" : "ai",
+          cacheEntryDeleted: fromCache,
+          rejectedAnswers,
+        });
         await sleep(Math.max(5_500, COMMAND_DELAY));
         continue;
       }
-      if (TERMINAL_FAILURE.test(message)) return "failed";
-      process.stderr.write(`quiz answer: ${String(err)}\n`);
+      if (TERMINAL_FAILURE.test(message)) {
+        log.warn("Quiz ended with a terminal failure", {
+          quizId,
+          answer,
+          attempt: answerAttempts,
+          error: message,
+        });
+        return "failed";
+      }
+      log.error("Quiz answer submission failed", err, {
+        quizId,
+        answer,
+        attempt: answerAttempts,
+      });
       return "failed";
     }
   }
 
+  log.warn("Quiz exhausted all answer attempts", {
+    quizId,
+    answerAttempts,
+    rejectedAnswers,
+    durationMs: Date.now() - startedAt,
+  });
   return "failed";
 }

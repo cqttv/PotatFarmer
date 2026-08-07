@@ -7,6 +7,7 @@ import {
   ZERO_STATS,
   type StatsRow,
 } from "./db.js";
+import { log } from "./logger.js";
 
 interface PlayerInfo {
   username: string;
@@ -92,6 +93,13 @@ export function updateFromRank(text: string): void {
     playerInfo.leaderboardRank = parseInt(rankMatch[1], 10);
     playerInfo.totalPlayers = parseInt(rankMatch[2], 10);
   }
+  log.debug("Player data updated from rank response", {
+    username: playerInfo.username,
+    potatoes: playerInfo.potatoes,
+    prestige: playerInfo.prestige,
+    rank: playerInfo.rank,
+    leaderboardRank: playerInfo.leaderboardRank,
+  });
 }
 
 // Matches the "[+N ⇒ total]" pattern in farm/steal/cdr/shop replies.
@@ -188,8 +196,14 @@ export function recordCommandResult(
   isError: boolean,
 ): void {
   if (responseText === null) return;
-  if (COOLDOWN_REGEX.test(responseText)) return;
-  if (command === Actions.FARM && /♻⏰/.test(responseText)) return;
+  if (COOLDOWN_REGEX.test(responseText)) {
+    log.debug("Ignoring cooldown response for stats", { command });
+    return;
+  }
+  if (command === Actions.FARM && /♻⏰/.test(responseText)) {
+    log.debug("Ignoring recycled farm response for stats", { command });
+    return;
+  }
 
   const balanceChange = parseBalanceChange(responseText);
   if (balanceChange) {
@@ -228,6 +242,7 @@ export function recordCommandResult(
   record(increment);
 
   addToStats(sessionTotals, increment);
+  log.debug("Command stats recorded", { command, isError, delta, increment });
 }
 
 function formatNumber(n: number): string {

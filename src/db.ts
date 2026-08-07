@@ -5,6 +5,8 @@ import {
   type StatementSync,
 } from "node:sqlite";
 
+import { log } from "./logger.js";
+
 export interface StatsRow {
   farm: number;
   farmAttempts: number;
@@ -99,6 +101,7 @@ function weekStartStr(): string {
 }
 
 export function initDb(): void {
+  const startedAt = Date.now();
   mkdirSync("data", { recursive: true });
   db = new DatabaseSync("data/stats.db");
   const today = todayStr();
@@ -301,10 +304,15 @@ export function initDb(): void {
     ...ZERO_STATS,
   };
   lastRecordDate = today;
+  log.info("Database initialized", {
+    path: "data/stats.db",
+    durationMs: Date.now() - startedAt,
+  });
 }
 
 export function closeDb(): void {
   db.close();
+  log.info("Database closed");
 }
 
 export function record(d: StatsRow): void {
@@ -332,6 +340,12 @@ export function recordBalanceChange(event: NewBalanceEvent): void {
   queries.insertBalanceEvent.run(
     event as unknown as Record<string, SQLInputValue>,
   );
+  log.debug("Balance change recorded", {
+    command: event.command,
+    category: event.category,
+    delta: event.delta,
+    balanceAfter: event.balanceAfter,
+  });
 }
 
 export function getBalanceEvents(from: string, to: string): BalanceEvent[] {
@@ -348,8 +362,10 @@ export function getQuizAnswer(question: string): string | null {
 export function saveQuizAnswer(question: string, answer: string): void {
   const now = new Date().toISOString();
   queries.upsertQuizAnswer.run(question, answer, now, now);
+  log.debug("Quiz answer cached", { question, answer });
 }
 
 export function deleteQuizAnswer(question: string, answer: string): void {
   queries.deleteQuizAnswer.run(question, answer);
+  log.info("Invalid quiz answer removed from cache", { question, answer });
 }

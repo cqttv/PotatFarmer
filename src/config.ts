@@ -21,6 +21,22 @@ export const AI_API_KEY = process.env["AI_API_KEY"]?.trim() ?? "";
 export type AIProvider = "openai" | "gemini" | "deepseek";
 export const API_PROVIDER = parseAIProvider(process.env["API_PROVIDER"]);
 export const CAN_RUN_QUIZZES = QUIZ_ENABLED && AI_API_KEY !== "";
+export type LogLevel = "debug" | "info" | "warn" | "error";
+export const LOG_LEVEL = parseLogLevel(process.env["LOG_LEVEL"]);
+
+function parseLogLevel(raw: string | undefined): LogLevel {
+  const level = raw?.trim().toLowerCase() ?? "info";
+  if (
+    level === "debug" ||
+    level === "info" ||
+    level === "warn" ||
+    level === "error"
+  )
+    return level;
+  throw new Error(
+    `Unsupported LOG_LEVEL ${JSON.stringify(raw)}; expected debug, info, warn, or error`,
+  );
+}
 
 function parseAIProvider(raw: string | undefined): AIProvider {
   const provider = raw?.trim().toLowerCase() ?? "openai";
