@@ -11,7 +11,10 @@ export const WEB_DASHBOARD_ENABLED =
 export const CONSOLE_STATS_ENABLED =
   process.env["CONSOLE_STATS_ENABLED"] !== "false";
 export const WEB_PORT = parseEnvNumber(process.env["WEB_PORT"], 3000);
-export const COMMAND_DELAY = parseEnvNumber(process.env["COMMAND_DELAY"], 1000);
+export const COMMAND_DELAY = Math.max(
+  5_000,
+  parseEnvNumber(process.env["COMMAND_DELAY"], 5_000),
+);
 export const STATUS_INTERVAL = parseEnvNumber(
   process.env["STATUS_INTERVAL"] ?? process.env["PLAN_DELAY"],
   30000,
