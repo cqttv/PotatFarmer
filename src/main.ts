@@ -1,6 +1,13 @@
 import type { Server } from "node:http";
 
 import { sendCommand, fetchRank } from "./api.js";
+import {
+  WEB_DASHBOARD_ENABLED,
+  CONSOLE_STATS_ENABLED,
+  BOT_PREFIX,
+  PLAN_DELAY,
+  CAN_RUN_QUIZZES,
+} from "./config.js";
 import { initDb, closeDb } from "./db.js";
 import { startServer } from "./http.js";
 import {
@@ -8,9 +15,11 @@ import {
   LevelsPlan,
   ShoppingPlan,
   FarmPlan,
+  QuizShoppingPlan,
   shouldRun,
   type CommandPlan,
 } from "./plans.js";
+import { runQuizPlan } from "./quiz.js";
 import {
   displayStats,
   playerInfo,
@@ -18,12 +27,6 @@ import {
   setLastCommand,
   updateFromRank,
 } from "./stats.js";
-import {
-  WEB_DASHBOARD_ENABLED,
-  CONSOLE_STATS_ENABLED,
-  BOT_PREFIX,
-  PLAN_DELAY,
-} from "./config.js";
 
 initDb();
 
@@ -97,6 +100,10 @@ async function run(): Promise<never> {
     await runPlan(LevelsPlan);
     await runPlan(ShoppingPlan);
     await runPlan(FarmPlan);
+    if (CAN_RUN_QUIZZES) {
+      const quizResult = await runQuizPlan();
+      if (quizResult === "completed") await runPlan(QuizShoppingPlan);
+    }
     await refreshRank();
     await sleep(PLAN_DELAY);
   }

@@ -116,6 +116,24 @@ const CLEAR_SEQ = "\x1Bc";
 export const sessionTotals: StatsRow = { ...ZERO_STATS };
 export const sessionStart = Date.now();
 
+export function recordQuizStats(
+  increment: Partial<
+    Pick<
+      StatsRow,
+      | "quizReward"
+      | "quizAttempts"
+      | "quizSuccesses"
+      | "quizAnswerAttempts"
+      | "quizCacheHits"
+      | "quizOpenAICalls"
+    >
+  >,
+): void {
+  const stats = { ...ZERO_STATS, ...increment };
+  record(stats);
+  addToStats(sessionTotals, stats);
+}
+
 const TRACKED_COMMANDS: ReadonlySet<string> = new Set([
   Actions.FARM,
   Actions.STEAL,
@@ -199,6 +217,12 @@ export function recordCommandResult(
     stealSuccesses: command === Actions.STEAL && delta > 0 ? 1 : 0,
     rankups: command === Actions.RANKUP && !isError ? 1 : 0,
     prestiges: command === Actions.PRESTIGE && !isError ? 1 : 0,
+    quizReward: 0,
+    quizAttempts: 0,
+    quizSuccesses: 0,
+    quizAnswerAttempts: 0,
+    quizCacheHits: 0,
+    quizOpenAICalls: 0,
   };
 
   record(increment);
@@ -298,11 +322,27 @@ function buildStatsRows(stats: StatsRow): string[] {
     rows.push(tableRow("Rank Ups:", formatNumber(stats.rankups), ANSI.cyan));
   if (stats.prestiges > 0)
     rows.push(tableRow("Prestiges:", formatNumber(stats.prestiges), ANSI.cyan));
+  if (stats.quizAttempts > 0)
+    rows.push(
+      commandStatRow(
+        "Quizzes:",
+        stats.quizSuccesses,
+        stats.quizAttempts,
+        stats.quizReward,
+      ),
+    );
+  if (stats.quizAnswerAttempts > 0)
+    rows.push(
+      tableRow(
+        "Quiz Answers:",
+        `${formatNumber(stats.quizAnswerAttempts)}  (${formatNumber(stats.quizCacheHits)} cached, ${formatNumber(stats.quizOpenAICalls)} API)`,
+      ),
+    );
 
   if (rows.length === 0) {
     rows.push(tableRow("", "–", ANSI.dim));
   } else {
-    const total = stats.farm + stats.steal;
+    const total = stats.farm + stats.steal + stats.quizReward;
     if (total !== 0)
       rows.push(tableRow("Total:", formatDelta(total), deltaColor(total)));
   }

@@ -11,6 +11,9 @@ export const Actions = {
   RANKUP: "rankup",
   PRESTIGE: "prestige",
   RANK: "rank",
+  QUIZ: "quiz",
+  ANSWER: "a",
+  SHOP_QUIZ: "shop quiz",
 } as const;
 
 export type Command = (typeof Actions)[keyof typeof Actions];
@@ -72,4 +75,8 @@ export const FarmPlan: CommandPlan = [
   { command: Actions.EAT, delay: COMMAND_DELAY },
   { command: Actions.FARM, delay: COMMAND_DELAY },
   { command: Actions.STEAL, delay: COMMAND_DELAY },
+];
+
+export const QuizShoppingPlan: CommandPlan = [
+  { command: Actions.SHOP_QUIZ, delay: COMMAND_DELAY },
 ];

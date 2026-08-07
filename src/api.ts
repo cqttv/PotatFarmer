@@ -17,6 +17,16 @@ interface ApiResponse {
   statusCode: number;
 }
 
+export class CommandError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "CommandError";
+    this.status = status;
+  }
+}
+
 export async function sendCommand(command: string): Promise<CommandResult> {
   const response = await fetch(API_URL, {
     method: "POST",
@@ -28,12 +38,12 @@ export async function sendCommand(command: string): Promise<CommandResult> {
     signal: AbortSignal.timeout(10_000),
   });
 
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
   const data = (await response.json()) as ApiResponse;
-  if (data.statusCode !== 200) {
-    throw new Error(
-      data.errors?.map((e) => e.message).join("; ") ?? "Unknown error",
+  if (!response.ok || data.statusCode !== 200) {
+    throw new CommandError(
+      data.errors?.map((e) => e.message).join("; ") ??
+        `HTTP ${response.status}`,
+      data.statusCode || response.status,
     );
   }
 

@@ -16,6 +16,9 @@ export const COMMAND_DELAY = parseEnvNumber(
   15000,
 );
 export const PLAN_DELAY = parseEnvNumber(process.env["PLAN_DELAY"], 60000);
+export const QUIZ_ENABLED = process.env["QUIZ_ENABLED"] !== "false";
+export const OPENAI_API_KEY = process.env["OPENAI_API_KEY"]?.trim() ?? "";
+export const CAN_RUN_QUIZZES = QUIZ_ENABLED && OPENAI_API_KEY !== "";
 
 function parseEnvNumber(raw: string | undefined, defaultValue: number): number {
   if (raw === undefined) return defaultValue;
