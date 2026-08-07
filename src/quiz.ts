@@ -6,7 +6,12 @@ import {
 } from "./api.js";
 import { answerQuizQuestion } from "./ai.js";
 import { BOT_PREFIX, COMMAND_DELAY } from "./config.js";
-import { deleteQuizAnswer, getQuizAnswer, saveQuizAnswer } from "./db.js";
+import {
+  deleteQuizAnswer,
+  getQuizAnswer,
+  recordBalanceChange,
+  saveQuizAnswer,
+} from "./db.js";
 import { Actions } from "./plans.js";
 import {
   playerInfo,
@@ -58,6 +63,16 @@ async function recordSuccess(
   const rank = await fetchRank();
   if (rank) updateFromRank(rank);
   const reward = Math.max(0, playerInfo.potatoes - balanceBefore);
+  if (reward > 0) {
+    recordBalanceChange({
+      executedAt: new Date().toISOString(),
+      command: `${Actions.ANSWER} ${answer}`,
+      category: "quiz",
+      delta: reward,
+      balanceAfter: playerInfo.potatoes,
+      responseText: `Correct quiz answer: ${answer}`,
+    });
+  }
   saveQuizAnswer(questionKey, answer);
   recordQuizStats({ quizSuccesses: 1, quizReward: reward });
 }
