@@ -7,8 +7,11 @@
 - To enable automatic quizzes, set `AI_API_KEY` to an OpenAI, Gemini, or
   DeepSeek API key and set `API_PROVIDER` to the matching provider. The provider
   defaults to `openai`. Set `QUIZ_ENABLED=false` to disable automatic quizzes.
-  Logs are emitted as structured JSON to stderr. Set `LOG_LEVEL=debug` for
-  command responses, scheduler decisions, and detailed quiz diagnostics.
+  Logs are emitted as structured JSON to stderr and retained in
+  `logs/potatfarmer.log`. Set `LOG_FILE` to choose a different path, and set
+  `LOG_LEVEL=debug` for command responses, scheduler decisions, and detailed
+  quiz diagnostics. To follow the retained logs, run
+  `tail -f logs/potatfarmer.log`.
 
 Example:
 

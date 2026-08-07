@@ -23,6 +23,7 @@ export const API_PROVIDER = parseAIProvider(process.env["API_PROVIDER"]);
 export const CAN_RUN_QUIZZES = QUIZ_ENABLED && AI_API_KEY !== "";
 export type LogLevel = "debug" | "info" | "warn" | "error";
 export const LOG_LEVEL = parseLogLevel(process.env["LOG_LEVEL"]);
+export const LOG_FILE = process.env["LOG_FILE"]?.trim() || "logs/potatfarmer.log";
 
 function parseLogLevel(raw: string | undefined): LogLevel {
   const level = raw?.trim().toLowerCase() ?? "debug";
