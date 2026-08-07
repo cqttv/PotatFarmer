@@ -219,6 +219,55 @@ export async function runQuizPlan(): Promise<QuizResult> {
         await recordSuccess(questionKey, answer, balanceBefore, quizId);
         return "completed";
       }
+
+      // PotatBotat sends a correct-answer message directly to Twitch and then
+      // may return no result to the REST caller. Verify the quiz is closed
+      // before treating that ambiguous response as another answer attempt.
+      if (result.text === null && (await confirmQuizCompleted(quizId))) {
+        await recordSuccess(questionKey, answer, balanceBefore, quizId);
+        return "completed";
+      }
+
+      if (result.text && INCORRECT.test(result.text)) {
+        recordQuizStats({ quizIncorrectAnswers: 1 });
+        rejectedAnswers.push(answer);
+        if (fromCache) deleteQuizAnswer(questionKey, answer);
+        log.warn("Quiz answer was incorrect", {
+          quizId,
+          answer,
+          attempt: answerAttempts,
+          source: fromCache ? "cache" : "ai",
+          cacheEntryDeleted: fromCache,
+          rejectedAnswers,
+        });
+        await sleep(Math.max(5_500, COMMAND_DELAY));
+        continue;
+      }
+
+      if (result.text && TERMINAL_FAILURE.test(result.text)) {
+        log.warn("Quiz ended with a terminal failure", {
+          quizId,
+          answer,
+          attempt: answerAttempts,
+          error: result.text,
+        });
+        return failQuiz();
+      }
+
+      if (result.text && COOLDOWN.test(result.text)) {
+        // A command cooldown does not consume one of PotatBotat's five quiz
+        // attempts, so do not let it exhaust the local attempt budget either.
+        answerAttempts -= 1;
+        recordQuizStats({ quizAnswerAttempts: -1 });
+        log.info("Quiz answer command is on cooldown; retrying", {
+          quizId,
+          answer,
+          remainingMs: deadline - Date.now(),
+        });
+        await sleep(Math.max(5_500, COMMAND_DELAY));
+        continue;
+      }
+
       log.warn("Quiz answer returned an unrecognized response", {
         quizId,
         answer,
