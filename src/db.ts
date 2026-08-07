@@ -5,6 +5,8 @@ import {
   type StatementSync,
 } from "node:sqlite";
 
+import { log } from "./logger.js";
+
 export interface StatsRow {
   farm: number;
   farmAttempts: number;
@@ -14,6 +16,14 @@ export interface StatsRow {
   stealSuccesses: number;
   rankups: number;
   prestiges: number;
+  quizReward: number;
+  quizAttempts: number;
+  quizSuccesses: number;
+  quizFailures: number;
+  quizAnswerAttempts: number;
+  quizIncorrectAnswers: number;
+  quizCacheHits: number;
+  quizApiCalls: number;
 }
 
 export interface BalanceEvent {
@@ -43,6 +53,9 @@ interface Queries {
   getWeek: StatementSync;
   insertBalanceEvent: StatementSync;
   getBalanceEvents: StatementSync;
+  getQuizAnswer: StatementSync;
+  upsertQuizAnswer: StatementSync;
+  deleteQuizAnswer: StatementSync;
 }
 
 export const ZERO_STATS: StatsRow = {
@@ -54,6 +67,14 @@ export const ZERO_STATS: StatsRow = {
   stealSuccesses: 0,
   rankups: 0,
   prestiges: 0,
+  quizReward: 0,
+  quizAttempts: 0,
+  quizSuccesses: 0,
+  quizFailures: 0,
+  quizAnswerAttempts: 0,
+  quizIncorrectAnswers: 0,
+  quizCacheHits: 0,
+  quizApiCalls: 0,
 };
 
 let db!: DatabaseSync;
@@ -84,6 +105,7 @@ function weekStartStr(): string {
 }
 
 export function initDb(): void {
+  const startedAt = Date.now();
   mkdirSync("data", { recursive: true });
   db = new DatabaseSync("data/stats.db");
   const today = todayStr();
@@ -100,7 +122,15 @@ export function initDb(): void {
       stealAttempts    INTEGER NOT NULL DEFAULT 0,
       stealSuccesses   INTEGER NOT NULL DEFAULT 0,
       rankups          INTEGER NOT NULL DEFAULT 0,
-      prestiges        INTEGER NOT NULL DEFAULT 0
+      prestiges        INTEGER NOT NULL DEFAULT 0,
+      quizReward       INTEGER NOT NULL DEFAULT 0,
+      quizAttempts     INTEGER NOT NULL DEFAULT 0,
+      quizSuccesses    INTEGER NOT NULL DEFAULT 0,
+      quizFailures     INTEGER NOT NULL DEFAULT 0,
+      quizAnswerAttempts INTEGER NOT NULL DEFAULT 0,
+      quizIncorrectAnswers INTEGER NOT NULL DEFAULT 0,
+      quizCacheHits    INTEGER NOT NULL DEFAULT 0,
+      quizApiCalls  INTEGER NOT NULL DEFAULT 0
     );
     INSERT OR IGNORE INTO totals (id) VALUES (1);
 
@@ -113,7 +143,15 @@ export function initDb(): void {
       stealAttempts    INTEGER NOT NULL DEFAULT 0,
       stealSuccesses   INTEGER NOT NULL DEFAULT 0,
       rankups          INTEGER NOT NULL DEFAULT 0,
-      prestiges        INTEGER NOT NULL DEFAULT 0
+      prestiges        INTEGER NOT NULL DEFAULT 0,
+      quizReward       INTEGER NOT NULL DEFAULT 0,
+      quizAttempts     INTEGER NOT NULL DEFAULT 0,
+      quizSuccesses    INTEGER NOT NULL DEFAULT 0,
+      quizFailures     INTEGER NOT NULL DEFAULT 0,
+      quizAnswerAttempts INTEGER NOT NULL DEFAULT 0,
+      quizIncorrectAnswers INTEGER NOT NULL DEFAULT 0,
+      quizCacheHits    INTEGER NOT NULL DEFAULT 0,
+      quizApiCalls  INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS balance_events (
@@ -129,7 +167,48 @@ export function initDb(): void {
       ON balance_events (executedAt);
     CREATE INDEX IF NOT EXISTS idx_balance_events_category_executedAt
       ON balance_events (category, executedAt);
+
+    CREATE TABLE IF NOT EXISTS quiz_answers (
+      question         TEXT PRIMARY KEY,
+      answer           TEXT NOT NULL,
+      createdAt        TEXT NOT NULL,
+      lastUsedAt       TEXT NOT NULL,
+      useCount         INTEGER NOT NULL DEFAULT 1
+    );
   `);
+
+  for (const table of ["totals", "daily"]) {
+    let columns = db
+      .prepare(`PRAGMA table_info(${table})`)
+      .all()
+      .map((row) => (row as { name: string }).name);
+    if (
+      columns.includes("quizOpenAICalls") &&
+      !columns.includes("quizApiCalls")
+    ) {
+      db.exec(
+        `ALTER TABLE ${table} RENAME COLUMN quizOpenAICalls TO quizApiCalls`,
+      );
+      columns = columns.map((column) =>
+        column === "quizOpenAICalls" ? "quizApiCalls" : column,
+      );
+    }
+    for (const column of [
+      "quizReward",
+      "quizAttempts",
+      "quizSuccesses",
+      "quizFailures",
+      "quizAnswerAttempts",
+      "quizIncorrectAnswers",
+      "quizCacheHits",
+      "quizApiCalls",
+    ]) {
+      if (!columns.includes(column))
+        db.exec(
+          `ALTER TABLE ${table} ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`,
+        );
+    }
+  }
 
   queries = {
     updateTotals: db.prepare(`
@@ -141,12 +220,20 @@ export function initDb(): void {
         stealAttempts    = stealAttempts    + @stealAttempts,
         stealSuccesses   = stealSuccesses   + @stealSuccesses,
         rankups          = rankups          + @rankups,
-        prestiges        = prestiges        + @prestiges
+        prestiges        = prestiges        + @prestiges,
+        quizReward       = quizReward       + @quizReward,
+        quizAttempts     = quizAttempts     + @quizAttempts,
+        quizSuccesses    = quizSuccesses    + @quizSuccesses,
+        quizFailures     = quizFailures     + @quizFailures,
+        quizAnswerAttempts = quizAnswerAttempts + @quizAnswerAttempts,
+        quizIncorrectAnswers = quizIncorrectAnswers + @quizIncorrectAnswers,
+        quizCacheHits    = quizCacheHits    + @quizCacheHits,
+        quizApiCalls  = quizApiCalls  + @quizApiCalls
       WHERE id = 1
     `),
     upsertDaily: db.prepare(`
-      INSERT INTO daily (date, farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges)
-      VALUES (@date, @farm, @farmAttempts, @farmSuccesses, @steal, @stealAttempts, @stealSuccesses, @rankups, @prestiges)
+      INSERT INTO daily (date, farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges, quizReward, quizAttempts, quizSuccesses, quizFailures, quizAnswerAttempts, quizIncorrectAnswers, quizCacheHits, quizApiCalls)
+      VALUES (@date, @farm, @farmAttempts, @farmSuccesses, @steal, @stealAttempts, @stealSuccesses, @rankups, @prestiges, @quizReward, @quizAttempts, @quizSuccesses, @quizFailures, @quizAnswerAttempts, @quizIncorrectAnswers, @quizCacheHits, @quizApiCalls)
       ON CONFLICT(date) DO UPDATE SET
         farm             = farm             + excluded.farm,
         farmAttempts     = farmAttempts     + excluded.farmAttempts,
@@ -155,13 +242,21 @@ export function initDb(): void {
         stealAttempts    = stealAttempts    + excluded.stealAttempts,
         stealSuccesses   = stealSuccesses   + excluded.stealSuccesses,
         rankups          = rankups          + excluded.rankups,
-        prestiges        = prestiges        + excluded.prestiges
+        prestiges        = prestiges        + excluded.prestiges,
+        quizReward       = quizReward       + excluded.quizReward,
+        quizAttempts     = quizAttempts     + excluded.quizAttempts,
+        quizSuccesses    = quizSuccesses    + excluded.quizSuccesses,
+        quizFailures     = quizFailures     + excluded.quizFailures,
+        quizAnswerAttempts = quizAnswerAttempts + excluded.quizAnswerAttempts,
+        quizIncorrectAnswers = quizIncorrectAnswers + excluded.quizIncorrectAnswers,
+        quizCacheHits    = quizCacheHits    + excluded.quizCacheHits,
+        quizApiCalls  = quizApiCalls  + excluded.quizApiCalls
     `),
     getTotals: db.prepare(
-      "SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges FROM totals WHERE id = 1",
+      "SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges, quizReward, quizAttempts, quizSuccesses, quizFailures, quizAnswerAttempts, quizIncorrectAnswers, quizCacheHits, quizApiCalls FROM totals WHERE id = 1",
     ),
     getDaily: db.prepare(
-      "SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges FROM daily WHERE date = ?",
+      "SELECT farm, farmAttempts, farmSuccesses, steal, stealAttempts, stealSuccesses, rankups, prestiges, quizReward, quizAttempts, quizSuccesses, quizFailures, quizAnswerAttempts, quizIncorrectAnswers, quizCacheHits, quizApiCalls FROM daily WHERE date = ?",
     ),
     getWeek: db.prepare(`
       SELECT
@@ -172,7 +267,15 @@ export function initDb(): void {
         COALESCE(SUM(stealAttempts), 0)    AS stealAttempts,
         COALESCE(SUM(stealSuccesses), 0)   AS stealSuccesses,
         COALESCE(SUM(rankups), 0)          AS rankups,
-        COALESCE(SUM(prestiges), 0)        AS prestiges
+        COALESCE(SUM(prestiges), 0)        AS prestiges,
+        COALESCE(SUM(quizReward), 0)       AS quizReward,
+        COALESCE(SUM(quizAttempts), 0)     AS quizAttempts,
+        COALESCE(SUM(quizSuccesses), 0)    AS quizSuccesses,
+        COALESCE(SUM(quizFailures), 0)     AS quizFailures,
+        COALESCE(SUM(quizAnswerAttempts), 0) AS quizAnswerAttempts,
+        COALESCE(SUM(quizIncorrectAnswers), 0) AS quizIncorrectAnswers,
+        COALESCE(SUM(quizCacheHits), 0)    AS quizCacheHits,
+        COALESCE(SUM(quizApiCalls), 0)  AS quizApiCalls
       FROM daily WHERE date >= ?
     `),
     insertBalanceEvent: db.prepare(`
@@ -185,6 +288,20 @@ export function initDb(): void {
       WHERE executedAt >= ? AND executedAt <= ?
       ORDER BY executedAt ASC, id ASC
     `),
+    getQuizAnswer: db.prepare(
+      "SELECT answer FROM quiz_answers WHERE question = ?",
+    ),
+    upsertQuizAnswer: db.prepare(`
+      INSERT INTO quiz_answers (question, answer, createdAt, lastUsedAt, useCount)
+      VALUES (?, ?, ?, ?, 1)
+      ON CONFLICT(question) DO UPDATE SET
+        answer = excluded.answer,
+        lastUsedAt = excluded.lastUsedAt,
+        useCount = quiz_answers.useCount + 1
+    `),
+    deleteQuizAnswer: db.prepare(
+      "DELETE FROM quiz_answers WHERE question = ? AND answer = ?",
+    ),
   };
 
   cache.totals = (queries.getTotals.get() as unknown as
@@ -203,10 +320,15 @@ export function initDb(): void {
     ...ZERO_STATS,
   };
   lastRecordDate = today;
+  log.info("Database initialized", {
+    path: "data/stats.db",
+    durationMs: Date.now() - startedAt,
+  });
 }
 
 export function closeDb(): void {
   db.close();
+  log.info("Database closed");
 }
 
 export function record(d: StatsRow): void {
@@ -234,8 +356,32 @@ export function recordBalanceChange(event: NewBalanceEvent): void {
   queries.insertBalanceEvent.run(
     event as unknown as Record<string, SQLInputValue>,
   );
+  log.debug("Balance change recorded", {
+    command: event.command,
+    category: event.category,
+    delta: event.delta,
+    balanceAfter: event.balanceAfter,
+  });
 }
 
 export function getBalanceEvents(from: string, to: string): BalanceEvent[] {
   return queries.getBalanceEvents.all(from, to) as unknown as BalanceEvent[];
+}
+
+export function getQuizAnswer(question: string): string | null {
+  const row = queries.getQuizAnswer.get(question) as
+    | { answer: string }
+    | undefined;
+  return row?.answer ?? null;
+}
+
+export function saveQuizAnswer(question: string, answer: string): void {
+  const now = new Date().toISOString();
+  queries.upsertQuizAnswer.run(question, answer, now, now);
+  log.debug("Quiz answer cached", { question, answer });
+}
+
+export function deleteQuizAnswer(question: string, answer: string): void {
+  queries.deleteQuizAnswer.run(question, answer);
+  log.info("Invalid quiz answer removed from cache", { question, answer });
 }

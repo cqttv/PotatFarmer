@@ -7,6 +7,7 @@ import {
   ZERO_STATS,
   type StatsRow,
 } from "./db.js";
+import { log } from "./logger.js";
 
 interface PlayerInfo {
   username: string;
@@ -92,6 +93,13 @@ export function updateFromRank(text: string): void {
     playerInfo.leaderboardRank = parseInt(rankMatch[1], 10);
     playerInfo.totalPlayers = parseInt(rankMatch[2], 10);
   }
+  log.debug("Player data updated from rank response", {
+    username: playerInfo.username,
+    potatoes: playerInfo.potatoes,
+    prestige: playerInfo.prestige,
+    rank: playerInfo.rank,
+    leaderboardRank: playerInfo.leaderboardRank,
+  });
 }
 
 // Matches the "[+N ⇒ total]" pattern in farm/steal/cdr/shop replies.
@@ -115,6 +123,26 @@ const CLEAR_SEQ = "\x1Bc";
 
 export const sessionTotals: StatsRow = { ...ZERO_STATS };
 export const sessionStart = Date.now();
+
+export function recordQuizStats(
+  increment: Partial<
+    Pick<
+      StatsRow,
+      | "quizReward"
+      | "quizAttempts"
+      | "quizSuccesses"
+      | "quizFailures"
+      | "quizAnswerAttempts"
+      | "quizIncorrectAnswers"
+      | "quizCacheHits"
+      | "quizApiCalls"
+    >
+  >,
+): void {
+  const stats = { ...ZERO_STATS, ...increment };
+  record(stats);
+  addToStats(sessionTotals, stats);
+}
 
 const TRACKED_COMMANDS: ReadonlySet<string> = new Set([
   Actions.FARM,
@@ -170,8 +198,14 @@ export function recordCommandResult(
   isError: boolean,
 ): void {
   if (responseText === null) return;
-  if (COOLDOWN_REGEX.test(responseText)) return;
-  if (command === Actions.FARM && /♻⏰/.test(responseText)) return;
+  if (COOLDOWN_REGEX.test(responseText)) {
+    log.debug("Ignoring cooldown response for stats", { command });
+    return;
+  }
+  if (command === Actions.FARM && /♻⏰/.test(responseText)) {
+    log.debug("Ignoring recycled farm response for stats", { command });
+    return;
+  }
 
   const balanceChange = parseBalanceChange(responseText);
   if (balanceChange) {
@@ -199,11 +233,20 @@ export function recordCommandResult(
     stealSuccesses: command === Actions.STEAL && delta > 0 ? 1 : 0,
     rankups: command === Actions.RANKUP && !isError ? 1 : 0,
     prestiges: command === Actions.PRESTIGE && !isError ? 1 : 0,
+    quizReward: 0,
+    quizAttempts: 0,
+    quizSuccesses: 0,
+    quizFailures: 0,
+    quizAnswerAttempts: 0,
+    quizIncorrectAnswers: 0,
+    quizCacheHits: 0,
+    quizApiCalls: 0,
   };
 
   record(increment);
 
   addToStats(sessionTotals, increment);
+  log.debug("Command stats recorded", { command, isError, delta, increment });
 }
 
 function formatNumber(n: number): string {
@@ -298,11 +341,34 @@ function buildStatsRows(stats: StatsRow): string[] {
     rows.push(tableRow("Rank Ups:", formatNumber(stats.rankups), ANSI.cyan));
   if (stats.prestiges > 0)
     rows.push(tableRow("Prestiges:", formatNumber(stats.prestiges), ANSI.cyan));
+  if (stats.quizAttempts > 0)
+    rows.push(
+      commandStatRow(
+        "Quizzes:",
+        stats.quizSuccesses,
+        stats.quizAttempts,
+        stats.quizReward,
+      ),
+    );
+  if (stats.quizAttempts > 0)
+    rows.push(
+      tableRow(
+        "Quiz Outcomes:",
+        `${formatNumber(stats.quizSuccesses)} correct, ${formatNumber(stats.quizFailures)} failed`,
+      ),
+    );
+  if (stats.quizAnswerAttempts > 0)
+    rows.push(
+      tableRow(
+        "Quiz Answers:",
+        `${formatNumber(stats.quizAnswerAttempts)}  (${formatNumber(stats.quizIncorrectAnswers)} incorrect, ${formatNumber(stats.quizCacheHits)} cached, ${formatNumber(stats.quizApiCalls)} API)`,
+      ),
+    );
 
   if (rows.length === 0) {
     rows.push(tableRow("", "–", ANSI.dim));
   } else {
-    const total = stats.farm + stats.steal;
+    const total = stats.farm + stats.steal + stats.quizReward;
     if (total !== 0)
       rows.push(tableRow("Total:", formatDelta(total), deltaColor(total)));
   }

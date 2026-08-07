@@ -95,7 +95,17 @@ function statRows(s) {
   }
   if (s.rankups > 0) out += row('Rank Ups:', fmt(s.rankups), 'cyan')
   if (s.prestiges > 0) out += row('Prestiges:', fmt(s.prestiges), 'cyan')
-  const total = s.farm + s.steal
+  if (s.quizAttempts > 0) {
+    const qd = delta(s.quizReward)
+    let qv = fmt(s.quizSuccesses) + ' / ' + fmt(s.quizAttempts) + ' (' + pct(s.quizSuccesses, s.quizAttempts) + ')'
+    if (qd) qv += '&nbsp;&nbsp;<span class="' + cls(s.quizReward) + '">' + qd + '</span>'
+    out += row('Quizzes:', qv)
+    out += row('Quiz Outcomes:', fmt(s.quizSuccesses) + ' correct, ' + fmt(s.quizFailures) + ' failed')
+  }
+  if (s.quizAnswerAttempts > 0) {
+    out += row('Quiz Answers:', fmt(s.quizAnswerAttempts) + ' (' + fmt(s.quizIncorrectAnswers) + ' incorrect, ' + fmt(s.quizCacheHits) + ' cached, ' + fmt(s.quizApiCalls) + ' API)')
+  }
+  const total = s.farm + s.steal + s.quizReward
   if (total !== 0) out += row('Total:', delta(total), cls(total))
   return out || row('', '&mdash;', 'dim')
 }
