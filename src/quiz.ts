@@ -42,6 +42,11 @@ function normalizeQuestion(question: string): string {
   return question.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+function failQuiz(): QuizResult {
+  recordQuizStats({ quizFailures: 1 });
+  return "failed";
+}
+
 function isCooldown(error: unknown): boolean {
   return error instanceof Error && COOLDOWN.test(error.message);
 }
@@ -160,7 +165,7 @@ export async function runQuizPlan(): Promise<QuizResult> {
         answerAttempts,
         durationMs: Date.now() - startedAt,
       });
-      return "failed";
+      return failQuiz();
     }
 
     const fromCache = answerAttempts === 0 && cachedAnswer !== null;
@@ -194,7 +199,7 @@ export async function runQuizPlan(): Promise<QuizResult> {
         answer,
         durationMs: Date.now() - startedAt,
       });
-      return "failed";
+      return failQuiz();
     }
 
     setLastCommand(`${BOT_PREFIX}${Actions.ANSWER} ${answer}`);
@@ -233,6 +238,7 @@ export async function runQuizPlan(): Promise<QuizResult> {
         return "completed";
       }
       if (INCORRECT.test(message)) {
+        recordQuizStats({ quizIncorrectAnswers: 1 });
         rejectedAnswers.push(answer);
         if (fromCache) deleteQuizAnswer(questionKey, answer);
         log.warn("Quiz answer was incorrect", {
@@ -253,14 +259,14 @@ export async function runQuizPlan(): Promise<QuizResult> {
           attempt: answerAttempts,
           error: message,
         });
-        return "failed";
+        return failQuiz();
       }
       log.error("Quiz answer submission failed", err, {
         quizId,
         answer,
         attempt: answerAttempts,
       });
-      return "failed";
+      return failQuiz();
     }
   }
 
@@ -270,5 +276,5 @@ export async function runQuizPlan(): Promise<QuizResult> {
     rejectedAnswers,
     durationMs: Date.now() - startedAt,
   });
-  return "failed";
+  return failQuiz();
 }

@@ -131,7 +131,9 @@ export function recordQuizStats(
       | "quizReward"
       | "quizAttempts"
       | "quizSuccesses"
+      | "quizFailures"
       | "quizAnswerAttempts"
+      | "quizIncorrectAnswers"
       | "quizCacheHits"
       | "quizApiCalls"
     >
@@ -234,7 +236,9 @@ export function recordCommandResult(
     quizReward: 0,
     quizAttempts: 0,
     quizSuccesses: 0,
+    quizFailures: 0,
     quizAnswerAttempts: 0,
+    quizIncorrectAnswers: 0,
     quizCacheHits: 0,
     quizApiCalls: 0,
   };
@@ -346,11 +350,18 @@ function buildStatsRows(stats: StatsRow): string[] {
         stats.quizReward,
       ),
     );
+  if (stats.quizAttempts > 0)
+    rows.push(
+      tableRow(
+        "Quiz Outcomes:",
+        `${formatNumber(stats.quizSuccesses)} correct, ${formatNumber(stats.quizFailures)} failed`,
+      ),
+    );
   if (stats.quizAnswerAttempts > 0)
     rows.push(
       tableRow(
         "Quiz Answers:",
-        `${formatNumber(stats.quizAnswerAttempts)}  (${formatNumber(stats.quizCacheHits)} cached, ${formatNumber(stats.quizApiCalls)} API)`,
+        `${formatNumber(stats.quizAnswerAttempts)}  (${formatNumber(stats.quizIncorrectAnswers)} incorrect, ${formatNumber(stats.quizCacheHits)} cached, ${formatNumber(stats.quizApiCalls)} API)`,
       ),
     );
 

@@ -100,9 +100,10 @@ function statRows(s) {
     let qv = fmt(s.quizSuccesses) + ' / ' + fmt(s.quizAttempts) + ' (' + pct(s.quizSuccesses, s.quizAttempts) + ')'
     if (qd) qv += '&nbsp;&nbsp;<span class="' + cls(s.quizReward) + '">' + qd + '</span>'
     out += row('Quizzes:', qv)
+    out += row('Quiz Outcomes:', fmt(s.quizSuccesses) + ' correct, ' + fmt(s.quizFailures) + ' failed')
   }
   if (s.quizAnswerAttempts > 0) {
-    out += row('Quiz Answers:', fmt(s.quizAnswerAttempts) + ' (' + fmt(s.quizCacheHits) + ' cached, ' + fmt(s.quizApiCalls) + ' API)')
+    out += row('Quiz Answers:', fmt(s.quizAnswerAttempts) + ' (' + fmt(s.quizIncorrectAnswers) + ' incorrect, ' + fmt(s.quizCacheHits) + ' cached, ' + fmt(s.quizApiCalls) + ' API)')
   }
   const total = s.farm + s.steal + s.quizReward
   if (total !== 0) out += row('Total:', delta(total), cls(total))
