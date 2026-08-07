@@ -150,6 +150,9 @@ export async function runQuizPlan(): Promise<QuizResult> {
     timeoutMs: QUIZ_TIMEOUT_MS,
   });
 
+  // #quiz and its #a alias share the same five-second command cooldown.
+  await sleep(Math.max(5_500, COMMAND_DELAY));
+
   while (answerAttempts < MAX_ATTEMPTS) {
     if (Date.now() >= deadline) {
       log.warn("Quiz deadline reached before selecting an answer", {
