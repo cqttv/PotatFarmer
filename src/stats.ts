@@ -66,7 +66,7 @@ export const playerInfo: PlayerInfo = {
 };
 
 export function updateFromRank(text: string): void {
-  const username = text.match(/@(\w+)/)?.[1];
+  const username = text.match(/(\w+)/)?.[1];
   const potatoes = text.match(/has (-?[\d,]+) potatoes/)?.[1];
   const prestige = text.match(/Prestige: (\d+)/)?.[1];
   const harvests = text.match(/Harvests: ([\d,]+)/)?.[1];
