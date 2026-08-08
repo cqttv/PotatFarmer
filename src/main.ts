@@ -299,8 +299,9 @@ async function run(): Promise<never> {
     webDashboardEnabled: WEB_DASHBOARD_ENABLED,
     consoleStatsEnabled: CONSOLE_STATS_ENABLED,
   });
-  await refreshRank();
   for (;;) {
+    await refreshRank();
+    await sleep(COMMAND_DELAY);
     await runStatusCycle();
     await sleep(STATUS_INTERVAL);
   }
