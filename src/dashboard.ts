@@ -13,6 +13,7 @@ button,input,select { font:inherit }
 button:focus-visible,input:focus-visible,select:focus-visible { outline:2px solid var(--cyan); outline-offset:2px }
 #page { display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:16px; max-width:1720px; margin:0 auto }
 #charts,#box { min-width:0; border:1px solid var(--line); background:var(--panel); align-self:start }
+#charts { position:relative }
 .hdr { display:flex; align-items:center; justify-content:space-between; min-height:44px; padding:8px 12px; color:var(--yellow); font-weight:bold; border-bottom:1px solid var(--line); letter-spacing:1.6px }
 .hdr small { color:var(--muted); font-weight:normal; letter-spacing:0 }
 .toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:end; padding:10px 12px; border-bottom:1px solid var(--line); background:#0c0f10 }
@@ -44,6 +45,10 @@ button:focus-visible,input:focus-visible,select:focus-visible { outline:2px soli
 .plot.expanded canvas { height:calc(100vh - 72px) }
 body.modal-open { overflow:hidden }
 #selection { position:absolute; z-index:3; top:39px; bottom:0; background:rgba(45,212,209,.12); border-left:1px solid var(--cyan); border-right:1px solid var(--cyan); pointer-events:none }
+#chartLoading { position:absolute; inset:0; z-index:15; display:flex; align-items:center; justify-content:center; gap:10px; background:rgba(9,11,12,.72); color:var(--yellow); font-weight:bold; letter-spacing:.8px; cursor:wait; backdrop-filter:blur(1px) }
+#chartLoading[hidden] { display:none }
+.spinner { width:20px; height:20px; border:2px solid #48545a; border-top-color:var(--yellow); border-radius:50%; animation:spin .7s linear infinite }
+@keyframes spin { to { transform:rotate(360deg) } }
 .sec { padding:5px 0; border-top:1px solid var(--line); color:var(--cyan); font-weight:bold; text-align:center; background:#0c0f10 }
 .row { display:flex; justify-content:space-between; gap:12px; padding:2px 14px }
 .row > :last-child { text-align:right }
@@ -91,6 +96,7 @@ body.modal-open { overflow:hidden }
       <section class="plot" data-chart="spending"><div class="plot-head"><div><span class="plot-title">Spending</span><span class="plot-meta" id="spendingMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="spending" type="button" aria-label="Expand Spending">Expand</button></div></div><canvas id="spending"></canvas></section>
       <section class="plot" data-chart="quiz"><div class="plot-head"><div><span class="plot-title">Quiz Rewards</span><span class="plot-meta" id="quizMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="quiz" type="button" aria-label="Expand Quiz Rewards">Expand</button></div></div><canvas id="quiz"></canvas></section>
     </div>
+    <div id="chartLoading" role="status" aria-live="polite" hidden><span class="spinner" aria-hidden="true"></span><span>Loading analytics&hellip;</span></div>
   </main>
   <aside id="box">
     <div class="hdr"><span>POTAT FARMER</span><small>live</small></div>
@@ -159,6 +165,8 @@ let chartFrame = 0
 let hoverFrame = 0
 let suppressClick = false
 let eventsController = null
+let requestSequence = 0
+let analyticsLoading = false
 const renderedPoints = {}
 function localInputValue(date) { return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0,16) }
 function updateRangeInputs(hours) {
@@ -205,6 +213,13 @@ function updateAnalytics() {
   document.getElementById('resetZoom').disabled = !zoomed
 }
 function hideTip() { document.getElementById('tip').hidden = true }
+function setLoading(value) {
+  analyticsLoading=value
+  document.getElementById('chartLoading').hidden=!value
+  document.querySelectorAll('.toolbar button:not(#resetZoom),.toolbar input,.toolbar select').forEach(control=>{control.disabled=value})
+  if(value)document.getElementById('resetZoom').disabled=true
+  document.getElementById('charts').setAttribute('aria-busy',String(value))
+}
 function categoryLabel(category) {
   return { harvest:'Harvest', steal:'Steal', spending:'Spending', quiz:'Quiz', rankup:'Rank up', prestige:'Prestige', other:'Other' }[category] || category
 }
@@ -307,11 +322,14 @@ function clampView(a,b) {
   viewFrom=new Date(start); viewTo=new Date(end); liveRangeHours=null; queueRedraw()
 }
 function resetZoom() { viewFrom=new Date(resetFrom); viewTo=new Date(resetTo); hover=null; pinned=null; drag=null; queueRedraw() }
-async function refreshCharts(resetView) {
+async function refreshCharts(resetView,showLoading) {
   if (liveRangeHours !== null) updateRangeInputs(liveRangeHours)
   const from=inputDate('from') || new Date(Date.now()-86400000), to=inputDate('to') || new Date()
   if (from>=to) { document.getElementById('foot').textContent='The start time must be before the end time'; return }
   const qs='?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString())
+  const requestId=++requestSequence
+  let redrawOwnsLoading=false
+  if(showLoading!==false)setLoading(true)
   try {
     if(eventsController)eventsController.abort();eventsController=new AbortController()
     const response=await fetch('/events'+qs,{signal:eventsController.signal})
@@ -325,8 +343,13 @@ async function refreshCharts(resetView) {
     } else { resetFrom=new Date(from);resetTo=new Date(to) }
     if(resetView || wasAtDefault || liveRangeHours!==null){viewFrom=new Date(resetFrom);viewTo=new Date(resetTo)}
     else clampView(viewFrom.getTime(),viewTo.getTime())
-    queueRedraw()
+    if(showLoading===false)queueRedraw()
+    else {
+      redrawOwnsLoading=true;cancelAnimationFrame(hoverFrame);cancelAnimationFrame(chartFrame)
+      chartFrame=requestAnimationFrame(()=>{redrawCharts();if(requestId===requestSequence)setLoading(false)})
+    }
   } catch(e) { if(e.name!=='AbortError')document.getElementById('foot').textContent='error: '+String(e) }
+  finally { if(requestId===requestSequence&&showLoading!==false&&!redrawOwnsLoading)setLoading(false) }
 }
 async function refresh() {
   try {
@@ -355,7 +378,7 @@ document.getElementById('from').addEventListener('input',()=>{liveRangeHours=nul
 document.getElementById('to').addEventListener('input',()=>{liveRangeHours=null;autoFitData=false})
 document.getElementById('apply').addEventListener('click',()=>{liveRangeHours=null;autoFitData=false;refreshCharts(true)})
 document.getElementById('resetZoom').addEventListener('click',resetZoom)
-document.querySelectorAll('#categoryFilter,#outcomeFilter,#impactFilter').forEach(el=>el.addEventListener('change',()=>{pinned=null;hover=null;queueRedraw()}))
+document.querySelectorAll('#categoryFilter,#outcomeFilter,#impactFilter').forEach(el=>el.addEventListener('change',()=>{setLoading(true);pinned=null;hover=null;requestAnimationFrame(()=>requestAnimationFrame(()=>{redrawCharts();setLoading(false)}))}))
 document.querySelectorAll('[data-expand]').forEach(btn=>btn.addEventListener('click',()=>toggleExpand(btn.dataset.expand)))
 chartDefs.forEach(def=>{
   const canvas=document.getElementById(def.id)
@@ -387,7 +410,7 @@ chartDefs.forEach(def=>{
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&expandedId)toggleExpand(expandedId)})
 window.addEventListener('resize',queueRedraw)
 updateRangeInputs(24);document.querySelector('[data-range="24"]').classList.add('active')
-refreshCharts(true);refresh();setInterval(refresh,1000);setInterval(()=>refreshCharts(false),15000)
+refreshCharts(true);refresh();setInterval(refresh,1000);setInterval(()=>{if(!analyticsLoading)refreshCharts(false,false)},15000)
 </script>
 </body>
 </html>`;
