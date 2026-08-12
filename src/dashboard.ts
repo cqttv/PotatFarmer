@@ -4,7 +4,7 @@ export const DASHBOARD_HTML = `<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="/favicon.ico" type="image/png">
-<title>Potat Farmer Analytics</title>
+<title>Potat Farmer</title>
 <style>
 :root { color-scheme:dark; --bg:#090b0c; --panel:#0f1214; --panel2:#131719; --line:#273036; --muted:#77838a; --text:#d5dcdf; --yellow:#ffda44; --cyan:#2dd4d1; --green:#4ade80; --red:#fb7185 }
 * { margin:0; padding:0; box-sizing:border-box }
