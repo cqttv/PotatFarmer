@@ -151,7 +151,7 @@ const TRACKED_COMMANDS: ReadonlySet<string> = new Set([
   Actions.PRESTIGE,
 ]);
 
-function balanceCategory(command: string): string {
+function eventCategory(command: string): string {
   if (command === Actions.STEAL) return "steal";
   if (command === Actions.FARM) return "harvest";
   if (command === Actions.RANKUP) return "rankup";
@@ -161,7 +161,7 @@ function balanceCategory(command: string): string {
     command === Actions.EAT ||
     command.startsWith("shop ")
   )
-    return "shop_cdr";
+    return "spending";
   return "other";
 }
 
@@ -199,11 +199,12 @@ export function recordCommandResult(
   responseText: string | null,
   isError: boolean,
 ): void {
+  if (command === Actions.STATUS) return;
   if (responseText === null) {
     recordEvent({
       executedAt: new Date().toISOString(),
       command,
-      category: balanceCategory(command),
+      category: eventCategory(command),
       delta: 0,
       balanceAfter: playerInfo.potatoes,
       succeeded: 0,
@@ -230,7 +231,7 @@ export function recordCommandResult(
   recordEvent({
     executedAt: new Date().toISOString(),
     command,
-    category: balanceCategory(command),
+    category: eventCategory(command),
     delta,
     balanceAfter: balanceChange?.balanceAfter ?? playerInfo.potatoes,
     succeeded: isError ? 0 : 1,
@@ -264,10 +265,11 @@ export function recordCommandResult(
 }
 
 export function recordCommandFailure(command: string, error: unknown): void {
+  if (command === Actions.STATUS) return;
   recordEvent({
     executedAt: new Date().toISOString(),
     command,
-    category: balanceCategory(command),
+    category: eventCategory(command),
     delta: 0,
     balanceAfter: playerInfo.potatoes,
     succeeded: 0,

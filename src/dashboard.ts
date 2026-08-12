@@ -85,7 +85,7 @@ body.modal-open { overflow:hidden }
       <section class="plot plot-wide" data-chart="overview"><div class="plot-head"><div><span class="plot-title">Balance &amp; Activity</span><span class="plot-meta" id="overviewMeta"></span><span class="legend"><span><i style="background:#4ade80"></i>Harvest</span><span><i style="background:#38bdf8"></i>Steal</span><span><i style="background:#fb7185"></i>Spend</span><span><i style="background:#c084fc"></i>Quiz</span><span><i style="background:#fb923c"></i>Rank</span><span><i style="background:#ffda44"></i>Prestige</span></span></div><div class="plot-tools"><button class="chart-action" data-expand="overview" type="button" aria-label="Expand Balance and Activity">Expand</button></div></div><canvas id="overview"></canvas></section>
       <section class="plot" data-chart="steal"><div class="plot-head"><div><span class="plot-title">Steal P&amp;L</span><span class="plot-meta" id="stealMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="steal" type="button" aria-label="Expand Steal P&amp;L">Expand</button></div></div><canvas id="steal"></canvas></section>
       <section class="plot" data-chart="harvest"><div class="plot-head"><div><span class="plot-title">Harvest Yield</span><span class="plot-meta" id="harvestMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="harvest" type="button" aria-label="Expand Harvest Yield">Expand</button></div></div><canvas id="harvest"></canvas></section>
-      <section class="plot" data-chart="shop"><div class="plot-head"><div><span class="plot-title">Shop &amp; CDR Spend</span><span class="plot-meta" id="shopMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="shop" type="button" aria-label="Expand Shop & CDR Spend">Expand</button></div></div><canvas id="shop"></canvas></section>
+      <section class="plot" data-chart="spending"><div class="plot-head"><div><span class="plot-title">Spending</span><span class="plot-meta" id="spendingMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="spending" type="button" aria-label="Expand Spending">Expand</button></div></div><canvas id="spending"></canvas></section>
       <section class="plot" data-chart="quiz"><div class="plot-head"><div><span class="plot-title">Quiz Rewards</span><span class="plot-meta" id="quizMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="quiz" type="button" aria-label="Expand Quiz Rewards">Expand</button></div></div><canvas id="quiz"></canvas></section>
     </div>
   </main>
@@ -134,7 +134,7 @@ const chartDefs = [
   { id:'overview', filter:e => true, mode:'balance', style:'line', color:'#ffda44' },
   { id:'steal', filter:e => e.category === 'steal', mode:'delta', style:'bar', color:'#2dd4d1' },
   { id:'harvest', filter:e => e.category === 'harvest', mode:'delta', style:'bar', color:'#2dd4d1' },
-  { id:'shop', filter:e => e.category === 'shop_cdr' || e.command === 'cdr' || e.command === 'eat' || e.command.startsWith('shop ') || e.command.includes('cooldown'), mode:'delta', style:'bar', color:'#2dd4d1' },
+  { id:'spending', filter:e => e.category === 'spending', mode:'delta', style:'bar', color:'#2dd4d1' },
   { id:'quiz', filter:e => e.category === 'quiz', mode:'delta', style:'bar', color:'#2dd4d1' },
 ]
 const chartPad = { l:62, r:18, t:20, b:38 }
@@ -197,10 +197,10 @@ function updateAnalytics() {
 }
 function hideTip() { document.getElementById('tip').hidden = true }
 function categoryLabel(category) {
-  return { harvest:'Harvest', steal:'Steal', shop_cdr:'Shop / CDR', quiz:'Quiz', rankup:'Rank up', prestige:'Prestige', other:'Other' }[category] || category
+  return { harvest:'Harvest', steal:'Steal', spending:'Spending', quiz:'Quiz', rankup:'Rank up', prestige:'Prestige', other:'Other' }[category] || category
 }
 function eventColor(category) {
-  return { harvest:'#4ade80', steal:'#38bdf8', shop_cdr:'#fb7185', quiz:'#c084fc', rankup:'#fb923c', prestige:'#ffda44' }[category] || '#94a3b8'
+  return { harvest:'#4ade80', steal:'#38bdf8', spending:'#fb7185', quiz:'#c084fc', rankup:'#fb923c', prestige:'#ffda44' }[category] || '#94a3b8'
 }
 function renderTip(point, canvas) {
   const tip = document.getElementById('tip'), changeClass = cls(point.delta)

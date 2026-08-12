@@ -211,6 +211,10 @@ export function initDb(): void {
     db.exec(
       "ALTER TABLE events ADD COLUMN succeeded INTEGER NOT NULL DEFAULT 1",
     );
+  db.exec(`
+    UPDATE events SET category = 'spending' WHERE category = 'shop_cdr';
+    DELETE FROM events WHERE command = 'status';
+  `);
 
   for (const table of ["totals", "daily"]) {
     let columns = db
