@@ -4,65 +4,93 @@ export const DASHBOARD_HTML = `<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="/favicon.ico" type="image/png">
-<title>Potat Farmer</title>
+<title>Potat Farmer Analytics</title>
 <style>
+:root { color-scheme:dark; --bg:#090b0c; --panel:#0f1214; --panel2:#131719; --line:#273036; --muted:#77838a; --text:#d5dcdf; --yellow:#ffda44; --cyan:#2dd4d1; --green:#4ade80; --red:#fb7185 }
 * { margin:0; padding:0; box-sizing:border-box }
-body { background:#0d0d0d; color:#ccc; font:13px/1.6 'Courier New',monospace; padding:16px }
-#page { display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:16px; max-width:1500px; margin:0 auto }
-#charts { min-width:0; border:1px solid #333; align-self:start; background:#0d0d0d }
-#box { border:1px solid #333; align-self:start }
-.hdr { text-align:center; padding:6px 0; color:#fd0; font-weight:bold; border-bottom:1px solid #333; letter-spacing:2px }
-.toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #333 }
-.toolbar label { color:#666; display:flex; align-items:center; gap:5px }
-.toolbar input,.toolbar button { background:#111; color:#ccc; border:1px solid #333; font:12px 'Courier New',monospace; padding:5px 7px; height:30px }
-.toolbar button { color:#fd0; cursor:pointer }
+body { background:var(--bg); color:var(--text); font:13px/1.55 'Courier New',monospace; padding:18px }
+button,input { font:inherit }
+button:focus-visible,input:focus-visible { outline:2px solid var(--cyan); outline-offset:2px }
+#page { display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:16px; max-width:1720px; margin:0 auto }
+#charts,#box { min-width:0; border:1px solid var(--line); background:var(--panel); align-self:start }
+.hdr { display:flex; align-items:center; justify-content:space-between; min-height:44px; padding:8px 12px; color:var(--yellow); font-weight:bold; border-bottom:1px solid var(--line); letter-spacing:1.6px }
+.hdr small { color:var(--muted); font-weight:normal; letter-spacing:0 }
+.toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:end; padding:10px 12px; border-bottom:1px solid var(--line); background:#0c0f10 }
+.toolbar label { color:var(--muted); display:grid; gap:3px; font-size:11px; text-transform:uppercase; letter-spacing:.6px }
+.toolbar input,.toolbar button,.chart-action { background:#111618; color:var(--text); border:1px solid #354047; padding:6px 9px; min-height:32px }
+.toolbar button,.chart-action { color:var(--yellow); cursor:pointer }
+.toolbar button:hover,.chart-action:hover,.toolbar button.active { background:#222a2d; border-color:#64737b }
+.toolbar button:disabled { color:#4f5a60; cursor:not-allowed; background:#0d1112; border-color:#273036 }
+.toolbar .divider { width:1px; height:28px; margin:0 2px; background:var(--line) }
+.hint { margin-left:auto; color:var(--muted); font-size:11px; align-self:center }
+.kpis { display:grid; grid-template-columns:repeat(6,minmax(100px,1fr)); border-bottom:1px solid var(--line) }
+.kpi { padding:10px 12px; min-width:0; border-right:1px solid var(--line) }
+.kpi:last-child { border-right:0 }
+.kpi-label { color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.8px; white-space:nowrap }
+.kpi-value { margin-top:2px; color:#fff; font-size:18px; line-height:1.25; overflow:hidden; text-overflow:ellipsis }
+.kpi-note { color:var(--muted); font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
 .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:12px }
-.plot { border:1px solid #333; min-width:0; background:#101010; position:relative }
-.plot h2 { color:#0cc; font-size:13px; text-align:center; padding:6px; border-bottom:1px solid #333; font-weight:bold }
-.plot canvas { display:block; width:100%; height:280px; cursor:crosshair }
-.sec { padding:3px 0; border-top:1px solid #333; color:#0cc; font-weight:bold; text-align:center }
-.row { display:flex; justify-content:space-between; padding:1px 14px }
-.lbl { color:#666 }
-.bt { border-top:1px solid #333 }
-.green { color:#3c3 } .red { color:#c33 } .cyan { color:#0cc }
-.yellow { color:#fd0 } .dim { color:#444 }
-#foot { text-align:center; color:#444; font-size:11px; margin-top:8px }
-#tip { position:fixed; z-index:10; pointer-events:none; min-width:190px; max-width:280px; background:#050505; border:1px solid #555; color:#ccc; padding:7px 9px; box-shadow:0 8px 24px #000; font-size:12px; line-height:1.45 }
-#tip .t { color:#fd0; font-weight:bold; margin-bottom:2px }
-#tip .k { color:#666 }
-@media (max-width:1050px) {
-  #page { grid-template-columns:1fr }
-  #box { order:-1 }
-}
-@media (max-width:760px) {
-  body { padding:10px }
-  .grid { grid-template-columns:1fr }
-  .plot canvas { height:240px }
-}
+.plot { border:1px solid var(--line); min-width:0; background:var(--panel2); position:relative; overflow:hidden }
+.plot-wide { grid-column:1 / -1 }
+.plot-head { display:flex; justify-content:space-between; align-items:center; min-height:39px; padding:5px 7px 5px 11px; border-bottom:1px solid var(--line) }
+.plot-title { color:var(--cyan); font-size:13px; font-weight:bold }
+.plot-meta { color:var(--muted); font-size:10px; margin-left:7px }
+.legend { display:inline-flex; flex-wrap:wrap; gap:7px; margin-left:10px; color:var(--muted); font-size:10px; font-weight:normal }
+.legend i { display:inline-block; width:7px; height:7px; margin-right:3px; border-radius:50% }
+.plot-tools { display:flex; gap:5px }
+.chart-action { min-height:26px; padding:3px 7px; color:var(--muted); font-size:11px }
+.plot canvas { display:block; width:100%; height:300px; cursor:crosshair; touch-action:none }
+.plot.expanded { position:fixed; inset:16px; z-index:20; box-shadow:0 18px 80px #000; border-color:#516169 }
+.plot.expanded canvas { height:calc(100vh - 72px) }
+body.modal-open { overflow:hidden }
+#selection { position:absolute; z-index:3; top:39px; bottom:0; background:rgba(45,212,209,.12); border-left:1px solid var(--cyan); border-right:1px solid var(--cyan); pointer-events:none }
+.sec { padding:5px 0; border-top:1px solid var(--line); color:var(--cyan); font-weight:bold; text-align:center; background:#0c0f10 }
+.row { display:flex; justify-content:space-between; gap:12px; padding:2px 14px }
+.row > :last-child { text-align:right }
+.lbl { color:var(--muted) }
+.bt { border-top:1px solid var(--line) }
+.green { color:var(--green) } .red { color:var(--red) } .cyan { color:var(--cyan) }
+.yellow { color:var(--yellow) } .dim { color:#566168 }
+#foot { text-align:center; color:#59646a; font-size:11px; margin-top:8px }
+#tip { position:fixed; z-index:30; pointer-events:none; min-width:205px; max-width:300px; background:#050607; border:1px solid #617078; color:var(--text); padding:8px 10px; box-shadow:0 8px 30px #000; font-size:12px; line-height:1.5 }
+#tip .t { color:var(--yellow); font-weight:bold; margin-bottom:3px }
+#tip .k { color:var(--muted) }
+@media (max-width:1250px) { .kpis { grid-template-columns:repeat(3,1fr) } .kpi:nth-child(3) { border-right:0 } .kpi:nth-child(-n+3) { border-bottom:1px solid var(--line) } }
+@media (max-width:1050px) { #page { grid-template-columns:1fr } #box { order:-1 } }
+@media (max-width:760px) { body { padding:8px } .grid { grid-template-columns:1fr; padding:8px } .plot-wide { grid-column:auto } .kpis { grid-template-columns:repeat(2,1fr) } .kpi { border-bottom:1px solid var(--line) !important } .kpi:nth-child(even) { border-right:0 } .plot canvas { height:260px } .hint { width:100%; margin-left:0 } .plot.expanded { inset:4px } }
 </style>
 </head>
 <body>
 <div id="page">
   <main id="charts">
-    <div class="hdr">BALANCE HISTORY</div>
+    <div class="hdr"><span>BALANCE ANALYTICS</span><small id="windowLabel">Selected window</small></div>
     <div class="toolbar">
       <label>From <input id="from" type="datetime-local"></label>
       <label>To <input id="to" type="datetime-local"></label>
-      <button id="range1" type="button">1h</button>
-      <button id="range4" type="button">4h</button>
-      <button id="range24" type="button">24h</button>
-      <button id="range7" type="button">7d</button>
+      <button data-range="1" type="button">1h</button>
+      <button data-range="4" type="button">4h</button>
+      <button data-range="24" type="button">24h</button>
+      <button data-range="168" type="button">7d</button>
+      <button data-range="720" type="button">30d</button>
+      <button data-range="2160" type="button">90d</button>
+      <button data-range="8760" type="button">1y</button>
+      <button data-range="all" type="button">All</button>
       <button id="apply" type="button">Apply</button>
+      <span class="divider"></span>
+      <button id="resetZoom" type="button" disabled>Reset zoom</button>
+      <span class="hint">Drag to zoom · wheel to zoom · Shift+drag to pan · double-click to reset</span>
     </div>
+    <section class="kpis" id="kpis" aria-label="Selected window metrics"></section>
     <div class="grid">
-      <section class="plot"><h2>Overview</h2><canvas id="overview"></canvas></section>
-      <section class="plot"><h2>Steal</h2><canvas id="steal"></canvas></section>
-      <section class="plot"><h2>Harvest</h2><canvas id="harvest"></canvas></section>
-      <section class="plot"><h2>Shop &amp; CDR</h2><canvas id="shop"></canvas></section>
+      <section class="plot plot-wide" data-chart="overview"><div class="plot-head"><div><span class="plot-title">Balance &amp; Activity</span><span class="plot-meta" id="overviewMeta"></span><span class="legend"><span><i style="background:#4ade80"></i>Harvest</span><span><i style="background:#38bdf8"></i>Steal</span><span><i style="background:#fb7185"></i>Spend</span><span><i style="background:#c084fc"></i>Quiz</span><span><i style="background:#fb923c"></i>Rank</span><span><i style="background:#ffda44"></i>Prestige</span></span></div><div class="plot-tools"><button class="chart-action" data-expand="overview" type="button" aria-label="Expand Balance and Activity">Expand</button></div></div><canvas id="overview"></canvas></section>
+      <section class="plot" data-chart="steal"><div class="plot-head"><div><span class="plot-title">Steal P&amp;L</span><span class="plot-meta" id="stealMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="steal" type="button" aria-label="Expand Steal P&amp;L">Expand</button></div></div><canvas id="steal"></canvas></section>
+      <section class="plot" data-chart="harvest"><div class="plot-head"><div><span class="plot-title">Harvest Yield</span><span class="plot-meta" id="harvestMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="harvest" type="button" aria-label="Expand Harvest Yield">Expand</button></div></div><canvas id="harvest"></canvas></section>
+      <section class="plot" data-chart="shop"><div class="plot-head"><div><span class="plot-title">Shop &amp; CDR Spend</span><span class="plot-meta" id="shopMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="shop" type="button" aria-label="Expand Shop & CDR Spend">Expand</button></div></div><canvas id="shop"></canvas></section>
+      <section class="plot" data-chart="quiz"><div class="plot-head"><div><span class="plot-title">Quiz Rewards</span><span class="plot-meta" id="quizMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="quiz" type="button" aria-label="Expand Quiz Rewards">Expand</button></div></div><canvas id="quiz"></canvas></section>
     </div>
   </main>
   <aside id="box">
-    <div class="hdr">POTAT FARMER</div>
+    <div class="hdr"><span>POTAT FARMER</span><small>live</small></div>
     <div id="root">Loading&hellip;</div>
   </aside>
 </div>
@@ -71,325 +99,277 @@ body { background:#0d0d0d; color:#ccc; font:13px/1.6 'Courier New',monospace; pa
 <script>
 const _esc = document.createElement('span')
 function esc(s) { _esc.textContent = String(s || ''); return _esc.innerHTML }
-function fmt(n) { return Number(n).toLocaleString() }
-function pct(s, a) { return a ? Math.round(s / a * 100) + '%' : '0%' }
-function delta(n) { return n > 0 ? '+' + fmt(n) : n < 0 ? '-' + fmt(-n) : '' }
-function cls(n) { return n > 0 ? 'green' : n < 0 ? 'red' : '' }
-function row(lbl, val, c) {
-  return '<div class="row"><span class="lbl">' + lbl + '</span><span' + (c ? ' class="' + c + '"' : '') + '>' + val + '</span></div>'
-}
+function fmt(n, digits) { return Number(n).toLocaleString(undefined, digits === undefined ? {} : { maximumFractionDigits: digits }) }
+function signed(n) { return n > 0 ? '+' + fmt(n) : n < 0 ? '-' + fmt(-n) : '0' }
+function pct(s, a) { return a ? fmt(s / a * 100, 1) + '%' : '0%' }
+function cls(n) { return n > 0 ? 'green' : n < 0 ? 'red' : 'dim' }
+function row(lbl, val, c) { return '<div class="row"><span class="lbl">' + lbl + '</span><span' + (c ? ' class="' + c + '"' : '') + '>' + val + '</span></div>' }
 function sec(label) { return '<div class="sec">' + label + '</div>' }
 function statRows(s) {
   let out = ''
-  if (s.farmAttempts > 0) {
-    const fd = delta(s.farm)
-    let fv = fmt(s.farmSuccesses) + ' / ' + fmt(s.farmAttempts) + ' (' + pct(s.farmSuccesses, s.farmAttempts) + ')'
-    if (fd) fv += '&nbsp;&nbsp;<span class="' + cls(s.farm) + '">' + fd + '</span>'
-    out += row('Farm:', fv)
-  }
-  if (s.stealAttempts > 0) {
-    const sd = delta(s.steal)
-    let sv = fmt(s.stealSuccesses) + ' / ' + fmt(s.stealAttempts) + ' (' + pct(s.stealSuccesses, s.stealAttempts) + ')'
-    if (sd) sv += '&nbsp;&nbsp;<span class="' + cls(s.steal) + '">' + sd + '</span>'
-    out += row('Steal:', sv)
-  }
+  if (s.farmAttempts > 0) out += row('Farm:', fmt(s.farmSuccesses) + ' / ' + fmt(s.farmAttempts) + ' (' + pct(s.farmSuccesses, s.farmAttempts) + ')&nbsp; <span class="' + cls(s.farm) + '">' + signed(s.farm) + '</span>')
+  if (s.stealAttempts > 0) out += row('Steal:', fmt(s.stealSuccesses) + ' / ' + fmt(s.stealAttempts) + ' (' + pct(s.stealSuccesses, s.stealAttempts) + ')&nbsp; <span class="' + cls(s.steal) + '">' + signed(s.steal) + '</span>')
   if (s.rankups > 0) out += row('Rank Ups:', fmt(s.rankups), 'cyan')
   if (s.prestiges > 0) out += row('Prestiges:', fmt(s.prestiges), 'cyan')
   if (s.quizAttempts > 0) {
-    const qd = delta(s.quizReward)
-    let qv = fmt(s.quizSuccesses) + ' / ' + fmt(s.quizAttempts) + ' (' + pct(s.quizSuccesses, s.quizAttempts) + ')'
-    if (qd) qv += '&nbsp;&nbsp;<span class="' + cls(s.quizReward) + '">' + qd + '</span>'
-    out += row('Quizzes:', qv)
+    out += row('Quizzes:', fmt(s.quizSuccesses) + ' / ' + fmt(s.quizAttempts) + ' (' + pct(s.quizSuccesses, s.quizAttempts) + ')&nbsp; <span class="' + cls(s.quizReward) + '">' + signed(s.quizReward) + '</span>')
     out += row('Quiz Outcomes:', fmt(s.quizSuccesses) + ' correct, ' + fmt(s.quizFailures) + ' failed')
   }
-  if (s.quizAnswerAttempts > 0) {
-    out += row('Quiz Answers:', fmt(s.quizAnswerAttempts) + ' (' + fmt(s.quizIncorrectAnswers) + ' incorrect, ' + fmt(s.quizCacheHits) + ' cached, ' + fmt(s.quizApiCalls) + ' API)')
-  }
+  if (s.quizAnswerAttempts > 0) out += row('Quiz Answers:', fmt(s.quizAnswerAttempts) + ' (' + fmt(s.quizIncorrectAnswers) + ' incorrect, ' + fmt(s.quizCacheHits) + ' cached, ' + fmt(s.quizApiCalls) + ' API)')
   const total = s.farm + s.steal + s.quizReward
-  if (total !== 0) out += row('Total:', delta(total), cls(total))
+  if (total !== 0) out += row('Total:', signed(total), cls(total))
   return out || row('', '&mdash;', 'dim')
 }
 function dur(ms) {
-  const t = Math.floor(ms / 1000), h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60
+  const t = Math.floor(ms / 1000), d = Math.floor(t / 86400), h = Math.floor((t % 86400) / 3600), m = Math.floor((t % 3600) / 60), s = t % 60
+  if (d > 0) return d + 'd ' + h + 'h'
   if (h > 0) return h + 'h ' + m + 'm'
   if (m > 0) return m + 'm ' + s + 's'
   return s + 's'
 }
-const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' })
-const dateTimeFmt = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+const timeFmt = new Intl.DateTimeFormat(undefined, { hour:'2-digit', minute:'2-digit' })
+const dateFmt = new Intl.DateTimeFormat(undefined, { month:'short', day:'numeric' })
+const dateTimeFmt = new Intl.DateTimeFormat(undefined, { dateStyle:'medium', timeStyle:'short' })
 const chartDefs = [
-  { id: 'overview', title: 'Overview', filter: e => true, mode: 'balance', style: 'line' },
-  { id: 'steal', title: 'Steal', filter: e => e.category === 'steal', mode: 'delta', style: 'bar' },
-  { id: 'harvest', title: 'Potato / Harvest', filter: e => e.category === 'harvest', mode: 'delta', style: 'line' },
-  { id: 'shop', title: 'Shop & CDR', filter: e => e.category === 'shop_cdr' || e.command === 'cdr' || e.command === 'eat' || e.command.startsWith('shop ') || e.command.includes('cooldown'), mode: 'delta', style: 'bar' },
+  { id:'overview', filter:e => true, mode:'balance', style:'line', color:'#ffda44' },
+  { id:'steal', filter:e => e.category === 'steal', mode:'delta', style:'bar', color:'#2dd4d1' },
+  { id:'harvest', filter:e => e.category === 'harvest', mode:'delta', style:'bar', color:'#2dd4d1' },
+  { id:'shop', filter:e => e.category === 'shop_cdr' || e.command === 'cdr' || e.command === 'eat' || e.command.startsWith('shop ') || e.command.includes('cooldown'), mode:'delta', style:'bar', color:'#2dd4d1' },
+  { id:'quiz', filter:e => e.category === 'quiz', mode:'delta', style:'bar', color:'#2dd4d1' },
 ]
-const chartPad = { l: 58, r: 14, t: 16, b: 34 }
+const chartPad = { l:62, r:18, t:20, b:38 }
+const MIN_WINDOW_MS = 10000
 let latestEvents = []
-let latestFrom = new Date(Date.now() - 86400000)
-let latestTo = new Date()
-let hover = null
+let queryFrom = new Date(Date.now() - 86400000)
+let queryTo = new Date()
+let viewFrom = new Date(queryFrom)
+let viewTo = new Date(queryTo)
+let resetFrom = new Date(queryFrom)
+let resetTo = new Date(queryTo)
 let liveRangeHours = 24
-function localInputValue(date) {
-  const offsetMs = date.getTimezoneOffset() * 60000
-  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16)
-}
+let autoFitData = false
+let hover = null
+let pinned = null
+let drag = null
+let expandedId = null
+let chartFrame = 0
+let suppressClick = false
+const renderedPoints = {}
+function localInputValue(date) { return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0,16) }
 function updateRangeInputs(hours) {
-  const to = new Date()
-  const from = new Date(to.getTime() - hours * 3600000)
+  const to = new Date(), from = hours === 'all' ? new Date(0) : new Date(to.getTime() - hours * 3600000)
   document.getElementById('from').value = localInputValue(from)
   document.getElementById('to').value = localInputValue(to)
 }
-function setRange(hours) {
-  liveRangeHours = hours
-  updateRangeInputs(hours)
-  refreshCharts()
-}
-function stopLiveRange() {
-  liveRangeHours = null
-}
-function inputDate(id) {
-  const v = document.getElementById(id).value
-  return v ? new Date(v) : null
-}
+function inputDate(id) { const v = document.getElementById(id).value; return v ? new Date(v) : null }
 function niceNum(n) {
-  if (Math.abs(n) >= 1000000) return (n / 1000000).toFixed(1).replace(/\\.0$/, '') + 'm'
-  if (Math.abs(n) >= 1000) return (n / 1000).toFixed(1).replace(/\\.0$/, '') + 'k'
+  if (Math.abs(n) >= 1000000000) return (n / 1000000000).toFixed(1).replace(/[.]0$/, '') + 'b'
+  if (Math.abs(n) >= 1000000) return (n / 1000000).toFixed(1).replace(/[.]0$/, '') + 'm'
+  if (Math.abs(n) >= 1000) return (n / 1000).toFixed(1).replace(/[.]0$/, '') + 'k'
   return String(Math.round(n))
 }
-function hideTip() {
-  document.getElementById('tip').hidden = true
+function visibleEvents() { const a = viewFrom.getTime(), b = viewTo.getTime(); return latestEvents.filter(e => { const t = Date.parse(e.executedAt); return t >= a && t <= b }) }
+function rangeLabel(from, to) {
+  const span = to.getTime() - from.getTime()
+  if (span < 86400000) return timeFmt.format(from) + ' – ' + timeFmt.format(to)
+  return dateFmt.format(from) + ' – ' + dateFmt.format(to)
+}
+function kpi(label, value, note, c) { return '<div class="kpi"><div class="kpi-label">' + label + '</div><div class="kpi-value ' + (c || '') + '">' + value + '</div><div class="kpi-note">' + note + '</div></div>' }
+function updateAnalytics() {
+  const events = visibleEvents(), transactions = events.filter(e => e.category !== 'rankup' && e.category !== 'prestige'), deltas = transactions.map(e => e.delta), net = deltas.reduce((a,b) => a + b, 0)
+  const gains = deltas.filter(n => n > 0), losses = deltas.filter(n => n < 0), positive = gains.length
+  const avg = transactions.length ? net / transactions.length : 0
+  const best = gains.reduce((largest,n) => Math.max(largest,n),0), worst = losses.reduce((smallest,n) => Math.min(smallest,n),0)
+  document.getElementById('windowLabel').textContent = rangeLabel(viewFrom, viewTo)
+  document.getElementById('kpis').innerHTML =
+    kpi('Net change', signed(net), 'selected window', cls(net)) +
+    kpi('Transactions', fmt(transactions.length), dur(viewTo - viewFrom), '') +
+    kpi('Positive rate', pct(positive, transactions.length), fmt(positive) + ' gains / ' + fmt(losses.length) + ' losses', positive >= losses.length ? 'green' : 'red') +
+    kpi('Average / event', signed(avg), 'net ÷ transactions', cls(avg)) +
+    kpi('Largest gain', signed(best), gains.length ? 'best transaction' : 'no gains', 'green') +
+    kpi('Largest loss', signed(worst), losses.length ? 'worst transaction' : 'no losses', losses.length ? 'red' : 'dim')
+  chartDefs.forEach(def => {
+    const series = events.filter(def.filter), total = series.reduce((sum,e) => sum + e.delta, 0)
+    document.getElementById(def.id + 'Meta').textContent = fmt(series.length) + ' events · ' + signed(total)
+  })
+  const zoomed = viewFrom.getTime() !== resetFrom.getTime() || viewTo.getTime() !== resetTo.getTime()
+  document.getElementById('resetZoom').disabled = !zoomed
+}
+function hideTip() { document.getElementById('tip').hidden = true }
+function categoryLabel(category) {
+  return { harvest:'Harvest', steal:'Steal', shop_cdr:'Shop / CDR', quiz:'Quiz', rankup:'Rank up', prestige:'Prestige', other:'Other' }[category] || category
+}
+function eventColor(category) {
+  return { harvest:'#4ade80', steal:'#38bdf8', shop_cdr:'#fb7185', quiz:'#c084fc', rankup:'#fb923c', prestige:'#ffda44' }[category] || '#94a3b8'
 }
 function renderTip(point, canvas) {
-  const tip = document.getElementById('tip')
-  const changeClass = point.delta < 0 ? 'red' : point.delta > 0 ? 'green' : 'dim'
-  tip.innerHTML =
-    '<div class="t">' + esc(dateTimeFmt.format(new Date(point.executedAt))) + '</div>' +
+  const tip = document.getElementById('tip'), changeClass = cls(point.delta)
+  tip.innerHTML = '<div class="t">' + esc(dateTimeFmt.format(new Date(point.executedAt))) + '</div>' +
     '<div><span class="k">Command:</span> ' + esc(point.command) + '</div>' +
-    '<div><span class="k">Change:</span> <span class="' + changeClass + '">' + delta(point.delta) + '</span></div>' +
-    '<div><span class="k">Balance:</span> ' + fmt(point.balanceAfter) + '</div>'
+    '<div><span class="k">Event:</span> ' + esc(categoryLabel(point.category)) + '</div>' +
+    '<div><span class="k">Outcome:</span> <span class="' + (point.succeeded ? 'green' : 'red') + '">' + (point.succeeded ? 'Completed' : 'Failed') + '</span></div>' +
+    '<div><span class="k">Change:</span> <span class="' + changeClass + '">' + signed(point.delta) + '</span></div>' +
+    '<div><span class="k">Balance after:</span> ' + fmt(point.balanceAfter) + '</div>'
   tip.hidden = false
-  const rect = canvas.getBoundingClientRect()
-  const tipRect = tip.getBoundingClientRect()
-  let left = rect.left + point.px + 12
-  let top = rect.top + point.py - tipRect.height - 12
-  if (left + tipRect.width > window.innerWidth - 8) left = rect.left + point.px - tipRect.width - 12
-  if (top < 8) top = rect.top + point.py + 12
-  tip.style.left = Math.max(8, left) + 'px'
-  tip.style.top = Math.min(window.innerHeight - tipRect.height - 8, Math.max(8, top)) + 'px'
+  const rect = canvas.getBoundingClientRect(), tr = tip.getBoundingClientRect()
+  let left = rect.left + point.px + 14, top = rect.top + point.py - tr.height - 14
+  if (left + tr.width > window.innerWidth - 8) left = rect.left + point.px - tr.width - 14
+  if (top < 8) top = rect.top + point.py + 14
+  tip.style.left = Math.max(8,left) + 'px'; tip.style.top = Math.min(window.innerHeight - tr.height - 8,Math.max(8,top)) + 'px'
 }
-function nearestPoint(points) {
-  if (!hover || points.length === 0) return null
-  let best = null
-  let bestDist = Infinity
+function nearestPoint(points, target) {
+  if (!target || !points.length) return null
+  let best = null, bestDist = Infinity
   points.forEach(p => {
-    if (p.barW) {
-      const left = p.barX - 3, right = p.barX + p.barW + 3
-      const top = p.barY - 3, bottom = p.barY + p.barH + 3
-      if (hover.x >= left && hover.x <= right && hover.y >= top && hover.y <= bottom) {
-        const dist = Math.abs(p.px - hover.x)
-        if (dist < bestDist) {
-          best = p
-          bestDist = dist
-        }
-      }
-      return
-    }
-    const dx = p.px - hover.x, dy = p.py - hover.y
-    const dist = Math.sqrt(dx * dx + dy * dy)
-    if (dist < bestDist) {
-      best = p
-      bestDist = dist
-    }
+    const dx = p.px - target.x, dy = p.py - target.y, dist = p.barW ? Math.abs(dx) : Math.sqrt(dx * dx + dy * dy)
+    const barHit = p.barW && target.x >= p.barX - 4 && target.x <= p.barX + p.barW + 4 && target.y >= p.barY - 4 && target.y <= p.barY + p.barH + 4
+    if ((barHit || dist < bestDist) && (!p.barW || barHit)) { best = p; bestDist = dist }
   })
-  return best && (best.barW || bestDist <= 12) ? best : null
+  return best && (best.barW || bestDist <= 14) ? best : null
 }
-function drawHoverLine(ctx, x, pad, ph) {
-  ctx.strokeStyle = '#777'
-  ctx.lineWidth = 1
-  ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + ph); ctx.stroke()
+function queueRedraw() {
+  cancelAnimationFrame(chartFrame)
+  chartFrame = requestAnimationFrame(redrawCharts)
 }
 function redrawCharts() {
-  hideTip()
-  chartDefs.forEach(def => drawChart(def, latestEvents, latestFrom, latestTo))
+  hideTip(); updateAnalytics()
+  const events = visibleEvents()
+  chartDefs.forEach(def => drawChart(def, events, viewFrom, viewTo))
 }
 function drawChart(def, events, from, to) {
-  const canvas = document.getElementById(def.id)
-  const rect = canvas.getBoundingClientRect()
-  const dpr = window.devicePixelRatio || 1
-  canvas.width = Math.max(1, Math.floor(rect.width * dpr))
-  canvas.height = Math.max(1, Math.floor(rect.height * dpr))
-  const ctx = canvas.getContext('2d')
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  const w = rect.width, h = rect.height
-  ctx.clearRect(0, 0, w, h)
-  ctx.fillStyle = '#101010'
-  ctx.fillRect(0, 0, w, h)
-  const pad = chartPad
-  const pw = Math.max(1, w - pad.l - pad.r), ph = Math.max(1, h - pad.t - pad.b)
-  const points = events.filter(def.filter).map(e => ({
-    t: new Date(e.executedAt).getTime(),
-    y: def.mode === 'balance' ? e.balanceAfter : e.delta,
-    delta: e.delta,
-    balanceAfter: e.balanceAfter,
-    command: e.command,
-    executedAt: e.executedAt,
-  }))
+  const canvas = document.getElementById(def.id), rect = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1
+  canvas.width = Math.max(1,Math.floor(rect.width * dpr)); canvas.height = Math.max(1,Math.floor(rect.height * dpr))
+  const ctx = canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0)
+  const w = rect.width, h = rect.height, pad = chartPad, pw = Math.max(1,w-pad.l-pad.r), ph = Math.max(1,h-pad.t-pad.b)
+  ctx.fillStyle = '#131719'; ctx.fillRect(0,0,w,h)
   const start = from.getTime(), end = to.getTime()
-  ctx.strokeStyle = '#2b2b2b'
-  ctx.lineWidth = 1
-  ctx.fillStyle = '#555'
-  ctx.font = '11px Courier New'
-  for (let i = 0; i <= 4; i++) {
-    const y = pad.t + (ph * i) / 4
-    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke()
+  function x(t) { return pad.l + ((t-start) / Math.max(1,end-start)) * pw }
+  const points = events.filter(def.filter).map(e => ({ id:e.id, t:Date.parse(e.executedAt), y:def.mode === 'balance' ? e.balanceAfter : e.delta, delta:e.delta, balanceAfter:e.balanceAfter, succeeded:e.succeeded, command:e.command, category:e.category, executedAt:e.executedAt }))
+  renderedPoints[def.id] = points
+  let minY, maxY
+  if (points.length) { minY = points.reduce((smallest,p) => Math.min(smallest,p.y),points[0].y); maxY = points.reduce((largest,p) => Math.max(largest,p.y),points[0].y) } else { minY = -1; maxY = 1 }
+  if (def.mode === 'delta') { minY = Math.min(minY,0); maxY = Math.max(maxY,0) }
+  if (minY === maxY) { const spread = Math.max(1,Math.abs(minY) * .05); minY -= spread; maxY += spread }
+  const yPad = (maxY-minY) * .1; minY -= yPad; maxY += yPad
+  function y(v) { return pad.t + (1-(v-minY)/(maxY-minY))*ph }
+  ctx.font = '11px Courier New'; ctx.textBaseline = 'alphabetic'; ctx.lineWidth = 1
+  for (let i=0;i<=4;i++) {
+    const gy = pad.t + ph*i/4, value = maxY-(maxY-minY)*i/4
+    ctx.strokeStyle = '#273036'; ctx.beginPath(); ctx.moveTo(pad.l,gy); ctx.lineTo(w-pad.r,gy); ctx.stroke()
+    ctx.fillStyle = '#77838a'; ctx.textAlign = 'right'; ctx.fillText(niceNum(value),pad.l-8,gy+4)
   }
-  for (let i = 0; i <= 3; i++) {
-    const x = pad.l + (pw * i) / 3
-    const label = timeFmt.format(new Date(start + ((end - start) * i) / 3))
-    ctx.fillText(label, Math.min(x, w - pad.r - 42), h - 12)
+  const ticks = w < 500 ? 3 : 5
+  for (let i=0;i<ticks;i++) {
+    const tx = pad.l + pw*i/(ticks-1), stamp = start+(end-start)*i/(ticks-1), label = end-start > 86400000 ? dateFmt.format(new Date(stamp)) : timeFmt.format(new Date(stamp))
+    ctx.fillStyle = '#77838a'; ctx.textAlign = i===0 ? 'left' : i===ticks-1 ? 'right' : 'center'; ctx.fillText(label,tx,h-12)
   }
-  const hoverX = hover ? Math.max(pad.l, Math.min(w - pad.r, x(hover.t))) : null
-  if (hoverX !== null) drawHoverLine(ctx, hoverX, pad, ph)
-  if (points.length === 0) {
-    ctx.fillStyle = '#444'
-    ctx.textAlign = 'center'
-    ctx.fillText('No balance changes in range', w / 2, h / 2)
-    ctx.textAlign = 'left'
-    return
-  }
-  let minY = Math.min(...points.map(p => p.y))
-  let maxY = Math.max(...points.map(p => p.y))
-  minY = Math.min(minY, 0)
-  maxY = Math.max(maxY, 0)
-  if (minY === maxY) { minY -= 1; maxY += 1 }
-  const yPad = (maxY - minY) * 0.08
-  minY -= yPad; maxY += yPad
-  function x(t) { return pad.l + ((t - start) / Math.max(1, end - start)) * pw }
-  function y(v) { return pad.t + (1 - (v - minY) / (maxY - minY)) * ph }
-  points.forEach(p => {
-    p.px = x(p.t)
-    p.py = y(p.y)
-  })
-  ctx.fillStyle = '#555'
-  ctx.fillText(niceNum(maxY), 8, pad.t + 6)
-  ctx.fillText(niceNum(minY), 8, pad.t + ph)
-  const zy = y(0)
-  ctx.strokeStyle = '#666'
-  ctx.beginPath(); ctx.moveTo(pad.l, zy); ctx.lineTo(w - pad.r, zy); ctx.stroke()
-  ctx.fillStyle = '#777'
-  ctx.fillText('0', 8, zy + 4)
+  ctx.textAlign = 'left'
+  if (!points.length) { ctx.fillStyle='#657178'; ctx.textAlign='center'; ctx.fillText('No transactions in this window',w/2,h/2); return }
+  points.forEach(p => { p.px=x(p.t); p.py=y(p.y) })
+  const zeroY = y(0)
+  if (zeroY >= pad.t && zeroY <= pad.t+ph) { ctx.strokeStyle='#69777e'; ctx.beginPath(); ctx.moveTo(pad.l,zeroY); ctx.lineTo(w-pad.r,zeroY); ctx.stroke() }
+  ctx.save(); ctx.beginPath(); ctx.rect(pad.l,pad.t,pw,ph); ctx.clip()
   if (def.style === 'bar') {
-    const bw = Math.max(4, Math.min(18, pw / Math.max(points.length * 1.6, 12)))
-    points.forEach(p => {
-      const top = Math.min(p.py, zy)
-      const height = Math.max(1, Math.abs(p.py - zy))
-      p.barX = Math.max(pad.l, Math.min(w - pad.r - bw, p.px - bw / 2))
-      p.barY = top
-      p.barW = bw
-      p.barH = height
-      ctx.fillStyle = p.delta < 0 ? '#cc3333' : '#33cc33'
-      ctx.fillRect(p.barX, p.barY, p.barW, p.barH)
-    })
+    const bw = Math.max(3,Math.min(20,pw/Math.max(points.length*1.5,16)))
+    points.forEach(p => { const top=Math.min(p.py,zeroY), height=Math.max(1,Math.abs(p.py-zeroY)); p.barX=p.px-bw/2; p.barY=top; p.barW=bw; p.barH=height; ctx.fillStyle=!p.succeeded||p.delta<0?'#fb7185':'#4ade80'; ctx.globalAlpha=.82; ctx.fillRect(p.barX,p.barY,bw,height) })
+    ctx.globalAlpha=1
   } else {
-    ctx.strokeStyle = def.mode === 'balance' ? '#ffdd33' : '#00cccc'
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    points.forEach((p, i) => {
-      const px = x(p.t), py = y(p.y)
-      if (i === 0) ctx.moveTo(px, py)
-      else ctx.lineTo(px, py)
-    })
-    ctx.stroke()
-    points.forEach(p => {
-      ctx.fillStyle = p.delta < 0 ? '#cc3333' : '#33cc33'
-      ctx.beginPath(); ctx.arc(p.px, p.py, 3, 0, Math.PI * 2); ctx.fill()
-    })
+    const gradient=ctx.createLinearGradient(0,pad.t,0,pad.t+ph); gradient.addColorStop(0,'rgba(255,218,68,.2)'); gradient.addColorStop(1,'rgba(255,218,68,0)')
+    ctx.beginPath(); points.forEach((p,i) => { if(i===0)ctx.moveTo(p.px,p.py);else ctx.lineTo(p.px,p.py) }); ctx.lineTo(points[points.length-1].px,pad.t+ph); ctx.lineTo(points[0].px,pad.t+ph); ctx.closePath(); ctx.fillStyle=gradient; ctx.fill()
+    ctx.beginPath(); points.forEach((p,i) => { if(i===0)ctx.moveTo(p.px,p.py);else ctx.lineTo(p.px,p.py) }); ctx.strokeStyle=def.color; ctx.lineWidth=2; ctx.stroke()
+    points.forEach(p => { ctx.fillStyle=eventColor(p.category);ctx.beginPath();ctx.arc(p.px,p.py,p.category==='rankup'||p.category==='prestige'?5:3.5,0,Math.PI*2);ctx.fill();if(!p.succeeded){ctx.strokeStyle='#fb7185';ctx.lineWidth=1.5;ctx.stroke()} })
   }
-  if (hoverX !== null) drawHoverLine(ctx, hoverX, pad, ph)
-  const active = hover?.id === def.id ? nearestPoint(points) : null
-  if (active) {
-    ctx.strokeStyle = '#ffdd33'
-    ctx.lineWidth = 2
-    if (active.barW) {
-      ctx.strokeRect(active.barX - 2, active.barY - 2, active.barW + 4, active.barH + 4)
-    } else {
-      ctx.fillStyle = '#101010'
-      ctx.beginPath(); ctx.arc(active.px, active.py, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
-    }
-    renderTip(active, canvas)
-  }
+  const active = pinned && pinned.chartId===def.id ? points.find(p=>p.id===pinned.eventId) || null : hover && hover.id===def.id ? nearestPoint(points,hover) : null
+  if (hover && hover.id===def.id) { ctx.strokeStyle='#849198'; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(hover.x,pad.t); ctx.lineTo(hover.x,pad.t+ph); ctx.stroke(); ctx.setLineDash([]) }
+  if (active) { ctx.strokeStyle='#fff'; ctx.lineWidth=2; if(active.barW)ctx.strokeRect(active.barX-2,active.barY-2,active.barW+4,active.barH+4);else { ctx.fillStyle='#131719'; ctx.beginPath();ctx.arc(active.px,active.py,6,0,Math.PI*2);ctx.fill();ctx.stroke() } }
+  ctx.restore()
+  if (active) renderTip(active,canvas)
 }
-async function refreshCharts() {
+function clampView(a,b) {
+  const q0=queryFrom.getTime(), q1=queryTo.getTime(), full=q1-q0, span=Math.max(MIN_WINDOW_MS,Math.min(full,b-a))
+  let start=a, end=a+span
+  if(start<q0){start=q0;end=q0+span} if(end>q1){end=q1;start=q1-span}
+  viewFrom=new Date(start); viewTo=new Date(end); liveRangeHours=null; queueRedraw()
+}
+function resetZoom() { viewFrom=new Date(resetFrom); viewTo=new Date(resetTo); hover=null; pinned=null; drag=null; queueRedraw() }
+async function refreshCharts(resetView) {
   if (liveRangeHours !== null) updateRangeInputs(liveRangeHours)
-  const from = inputDate('from') || new Date(Date.now() - 86400000)
-  const to = inputDate('to') || new Date()
-  const qs = '?from=' + encodeURIComponent(from.toISOString()) + '&to=' + encodeURIComponent(to.toISOString())
-  const events = await fetch('/balance-events' + qs).then(r => r.json())
-  latestEvents = events.events || []
-  latestFrom = from
-  latestTo = to
-  redrawCharts()
+  const from=inputDate('from') || new Date(Date.now()-86400000), to=inputDate('to') || new Date()
+  if (from>=to) { document.getElementById('foot').textContent='The start time must be before the end time'; return }
+  const qs='?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString())
+  try {
+    const response=await fetch('/events'+qs)
+    if(!response.ok)throw new Error('events request failed ('+response.status+')')
+    const payload=await response.json(), wasAtDefault=viewFrom.getTime()===resetFrom.getTime() && viewTo.getTime()===resetTo.getTime()
+    latestEvents=payload.events || []; queryFrom=from; queryTo=to
+    if(autoFitData && latestEvents.length){
+      const first=Date.parse(latestEvents[0].executedAt),last=Date.parse(latestEvents[latestEvents.length-1].executedAt),dataSpan=Math.max(MIN_WINDOW_MS,last-first),padding=Math.max(3600000,dataSpan*.05)
+      resetFrom=new Date(Math.max(from.getTime(),first-padding));resetTo=new Date(Math.min(to.getTime(),last+padding))
+    } else { resetFrom=new Date(from);resetTo=new Date(to) }
+    if(resetView || wasAtDefault || liveRangeHours!==null){viewFrom=new Date(resetFrom);viewTo=new Date(resetTo)}
+    else clampView(viewFrom.getTime(),viewTo.getTime())
+    queueRedraw()
+  } catch(e) { document.getElementById('foot').textContent='error: '+String(e) }
 }
 async function refresh() {
   try {
-    const d = await fetch('/stats').then(r => r.json())
-    const p = d.player
-    document.getElementById('root').innerHTML =
-      row('User:', esc(p.username) || '&mdash;', 'yellow') +
-      row('Potatoes:', fmt(p.potatoes), p.potatoes < 0 ? 'red' : 'green') +
-      row('Prestige:', fmt(p.prestige)) +
-      row('Farm:', esc(p.farmSize) || '&mdash;') +
-      row('Rank:', '#' + fmt(p.leaderboardRank) + ' / ' + fmt(p.totalPlayers)) +
-      row('Harvests:', fmt(p.harvests)) +
-      row('Steals:', fmt(p.steals)) +
-      row('Stolen From:', fmt(p.stolenFrom)) +
-      sec('Session &nbsp; ' + dur(d.session.elapsedMs)) +
-      statRows(d.session) +
-      sec('Today') +
-      statRows(d.today) +
-      sec('Last 7 Days') +
-      statRows(d.week) +
-      sec('All Time') +
-      statRows(d.allTime) +
-      '<div class="bt">' +
-      row('Last Command:', esc(p.lastCommand) || '&mdash;', 'yellow') +
-      '</div>'
-    document.getElementById('foot').textContent = 'updated ' + new Date().toLocaleTimeString()
-  } catch(e) {
-    document.getElementById('foot').textContent = 'error: ' + String(e)
-  }
+    const response=await fetch('/stats'); if(!response.ok)throw new Error('stats request failed ('+response.status+')')
+    const d=await response.json(),p=d.player
+    document.getElementById('root').innerHTML=
+      row('User:',esc(p.username)||'&mdash;','yellow')+row('Potatoes:',fmt(p.potatoes),p.potatoes<0?'red':'green')+row('Prestige:',fmt(p.prestige))+row('Farm:',esc(p.farmSize)||'&mdash;')+
+      row('Rank:','#'+fmt(p.leaderboardRank)+' / '+fmt(p.totalPlayers))+row('Harvests:',fmt(p.harvests))+row('Steals:',fmt(p.steals))+row('Stolen From:',fmt(p.stolenFrom))+
+      sec('Session &nbsp; '+dur(d.session.elapsedMs))+statRows(d.session)+sec('Today')+statRows(d.today)+sec('Last 7 Days')+statRows(d.week)+sec('All Time')+statRows(d.allTime)+
+      '<div class="bt">'+row('Last Command:',esc(p.lastCommand)||'&mdash;','yellow')+'</div>'
+    document.getElementById('foot').textContent='updated '+new Date().toLocaleTimeString()
+  } catch(e) { document.getElementById('foot').textContent='error: '+String(e) }
 }
-document.getElementById('range1').addEventListener('click', () => setRange(1))
-document.getElementById('range4').addEventListener('click', () => setRange(4))
-document.getElementById('range24').addEventListener('click', () => setRange(24))
-document.getElementById('range7').addEventListener('click', () => setRange(24 * 7))
-document.getElementById('from').addEventListener('input', stopLiveRange)
-document.getElementById('to').addEventListener('input', stopLiveRange)
-document.getElementById('apply').addEventListener('click', () => {
-  stopLiveRange()
-  refreshCharts()
-})
-chartDefs.forEach(def => {
-  const canvas = document.getElementById(def.id)
-  canvas.addEventListener('mousemove', e => {
-    const rect = canvas.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-    const pw = Math.max(1, rect.width - chartPad.l - chartPad.r)
-    const ratio = Math.max(0, Math.min(1, (x - chartPad.l) / pw))
-    hover = { id: def.id, x, y, t: latestFrom.getTime() + (latestTo.getTime() - latestFrom.getTime()) * ratio }
-    redrawCharts()
+function toggleExpand(id) {
+  const next=expandedId===id?null:id
+  document.querySelectorAll('.plot').forEach(el=>el.classList.toggle('expanded',el.dataset.chart===next))
+  document.querySelectorAll('[data-expand]').forEach(btn=>btn.textContent=btn.dataset.expand===next?'Close':'Expand')
+  expandedId=next;document.body.classList.toggle('modal-open',Boolean(next));hover=null;pinned=null;queueRedraw()
+}
+document.querySelectorAll('[data-range]').forEach(btn=>btn.addEventListener('click',()=>{
+  liveRangeHours=btn.dataset.range === 'all' ? 'all' : Number(btn.dataset.range);updateRangeInputs(liveRangeHours)
+  autoFitData=liveRangeHours === 'all' || liveRangeHours >= 8760
+  document.querySelectorAll('[data-range]').forEach(b=>b.classList.toggle('active',b===btn));refreshCharts(true)
+}))
+document.getElementById('from').addEventListener('input',()=>{liveRangeHours=null;autoFitData=false})
+document.getElementById('to').addEventListener('input',()=>{liveRangeHours=null;autoFitData=false})
+document.getElementById('apply').addEventListener('click',()=>{liveRangeHours=null;autoFitData=false;refreshCharts(true)})
+document.getElementById('resetZoom').addEventListener('click',resetZoom)
+document.querySelectorAll('[data-expand]').forEach(btn=>btn.addEventListener('click',()=>toggleExpand(btn.dataset.expand)))
+chartDefs.forEach(def=>{
+  const canvas=document.getElementById(def.id)
+  function position(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top,width:r.width}}
+  canvas.addEventListener('pointerdown',e=>{if(e.button!==0)return;const p=position(e);drag={id:def.id,startX:p.x,lastX:p.x,pan:e.shiftKey,from:viewFrom.getTime(),to:viewTo.getTime()};canvas.setPointerCapture(e.pointerId);hideTip()})
+  canvas.addEventListener('pointermove',e=>{
+    const p=position(e)
+    if(drag&&drag.id===def.id){
+      if(drag.pan){const dx=p.x-drag.lastX,span=viewTo-viewFrom;clampView(viewFrom.getTime()-dx/Math.max(1,p.width-chartPad.l-chartPad.r)*span,viewTo.getTime()-dx/Math.max(1,p.width-chartPad.l-chartPad.r)*span);drag.lastX=p.x}
+      else {let sel=canvas.parentElement.querySelector('#selection');if(!sel){sel=document.createElement('div');sel.id='selection';canvas.parentElement.appendChild(sel)}sel.style.left=Math.min(drag.startX,p.x)+'px';sel.style.width=Math.abs(p.x-drag.startX)+'px'}
+      return
+    }
+    const ratio=Math.max(0,Math.min(1,(p.x-chartPad.l)/Math.max(1,p.width-chartPad.l-chartPad.r)))
+    hover={id:def.id,x:p.x,y:p.y,t:viewFrom.getTime()+(viewTo-viewFrom)*ratio};queueRedraw()
   })
-  canvas.addEventListener('mouseleave', () => {
-    hover = null
-    redrawCharts()
+  canvas.addEventListener('pointerup',e=>{
+    if(!drag||drag.id!==def.id)return
+    const p=position(e),selection=document.getElementById('selection');if(selection)selection.remove()
+    suppressClick=Math.abs(p.x-drag.startX)>5
+    if(!drag.pan&&Math.abs(p.x-drag.startX)>8){const pw=Math.max(1,p.width-chartPad.l-chartPad.r),a=Math.max(0,Math.min(1,(drag.startX-chartPad.l)/pw)),b=Math.max(0,Math.min(1,(p.x-chartPad.l)/pw)),start=drag.from+(drag.to-drag.from)*Math.min(a,b),end=drag.from+(drag.to-drag.from)*Math.max(a,b);clampView(start,end)}
+    drag=null
   })
+  canvas.addEventListener('pointercancel',()=>{drag=null;const selection=document.getElementById('selection');if(selection)selection.remove()})
+  canvas.addEventListener('mouseleave',()=>{if(!drag){hover=null;queueRedraw()}})
+  canvas.addEventListener('wheel',e=>{e.preventDefault();const p=position(e),pw=Math.max(1,p.width-chartPad.l-chartPad.r),ratio=Math.max(0,Math.min(1,(p.x-chartPad.l)/pw)),start=viewFrom.getTime(),end=viewTo.getTime(),anchor=start+(end-start)*ratio,factor=e.deltaY>0?1.35:.72;clampView(anchor-(anchor-start)*factor,anchor+(end-anchor)*factor)},{passive:false})
+  canvas.addEventListener('click',e=>{if(suppressClick){suppressClick=false;return}const p=position(e),point=nearestPoint(renderedPoints[def.id]||[],p);pinned=point?{chartId:def.id,eventId:point.id}:null;hover=point?{id:def.id,x:p.x,y:p.y}:null;queueRedraw()})
+  canvas.addEventListener('dblclick',resetZoom)
 })
-window.addEventListener('resize', redrawCharts)
-setRange(24)
-refresh()
-setInterval(refresh, 1000)
-setInterval(refreshCharts, 15000)
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&expandedId)toggleExpand(expandedId)})
+window.addEventListener('resize',queueRedraw)
+updateRangeInputs(24);document.querySelector('[data-range="24"]').classList.add('active')
+refreshCharts(true);refresh();setInterval(refresh,1000);setInterval(()=>refreshCharts(false),15000)
 </script>
 </body>
 </html>`;

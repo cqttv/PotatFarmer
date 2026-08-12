@@ -1,7 +1,7 @@
 import { createServer, type OutgoingHttpHeaders, type Server } from "node:http";
 
 import { DASHBOARD_HTML } from "./dashboard.js";
-import { cache, getBalanceEvents } from "./db.js";
+import { cache, getEvents } from "./db.js";
 import { playerInfo, sessionTotals, sessionStart } from "./stats.js";
 import { WEB_PORT } from "./config.js";
 import { log } from "./logger.js";
@@ -55,7 +55,7 @@ export function startServer(): Server {
       return;
     }
 
-    if (req.method === "GET" && url === "/balance-events") {
+    if (req.method === "GET" && url === "/events") {
       const now = Date.now();
       const fromParam = reqUrl.searchParams.get("from");
       const toParam = reqUrl.searchParams.get("to");
@@ -63,7 +63,7 @@ export function startServer(): Server {
       const toMs = toParam ? Date.parse(toParam) : now;
       const from = new Date(Number.isNaN(fromMs) ? now - 86400000 : fromMs);
       const to = new Date(Number.isNaN(toMs) ? now : toMs);
-      const events = getBalanceEvents(from.toISOString(), to.toISOString());
+      const events = getEvents(from.toISOString(), to.toISOString());
       const body = JSON.stringify({ events });
       res.writeHead(200, JSON_HEADERS);
       res.end(body);

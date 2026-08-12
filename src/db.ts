@@ -26,22 +26,24 @@ export interface StatsRow {
   quizApiCalls: number;
 }
 
-export interface BalanceEvent {
+export interface Event {
   id: number;
   executedAt: string;
   command: string;
   category: string;
   delta: number;
   balanceAfter: number;
+  succeeded: number;
   responseText: string;
 }
 
-export interface NewBalanceEvent {
+export interface NewEvent {
   executedAt: string;
   command: string;
   category: string;
   delta: number;
   balanceAfter: number;
+  succeeded: number;
   responseText: string;
 }
 
@@ -51,8 +53,8 @@ interface Queries {
   getTotals: StatementSync;
   getDaily: StatementSync;
   getWeek: StatementSync;
-  insertBalanceEvent: StatementSync;
-  getBalanceEvents: StatementSync;
+  insertEvent: StatementSync;
+  getEvents: StatementSync;
   getQuizAnswer: StatementSync;
   upsertQuizAnswer: StatementSync;
   deleteQuizAnswer: StatementSync;
@@ -112,6 +114,29 @@ export function initDb(): void {
 
   db.exec("PRAGMA journal_mode = WAL");
 
+  const legacyEvents = db
+    .prepare(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'balance_events'",
+    )
+    .get();
+  const currentEvents = db
+    .prepare(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'events'",
+    )
+    .get();
+  if (legacyEvents && !currentEvents) {
+    db.exec("ALTER TABLE balance_events RENAME TO events");
+    log.info("Migrated balance events to general event history");
+  } else if (legacyEvents && currentEvents) {
+    db.exec(`
+      INSERT INTO events (executedAt, command, category, delta, balanceAfter, responseText)
+      SELECT executedAt, command, category, delta, balanceAfter, responseText
+      FROM balance_events;
+      DROP TABLE balance_events;
+    `);
+    log.info("Merged legacy balance events into general event history");
+  }
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS totals (
       id               INTEGER PRIMARY KEY CHECK (id = 1),
@@ -154,19 +179,20 @@ export function initDb(): void {
       quizApiCalls  INTEGER NOT NULL DEFAULT 0
     );
 
-    CREATE TABLE IF NOT EXISTS balance_events (
+    CREATE TABLE IF NOT EXISTS events (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
       executedAt       TEXT    NOT NULL,
       command          TEXT    NOT NULL,
       category         TEXT    NOT NULL,
       delta            INTEGER NOT NULL,
       balanceAfter     INTEGER NOT NULL,
+      succeeded        INTEGER NOT NULL DEFAULT 1,
       responseText     TEXT    NOT NULL DEFAULT ''
     );
-    CREATE INDEX IF NOT EXISTS idx_balance_events_executedAt
-      ON balance_events (executedAt);
-    CREATE INDEX IF NOT EXISTS idx_balance_events_category_executedAt
-      ON balance_events (category, executedAt);
+    CREATE INDEX IF NOT EXISTS idx_events_executedAt
+      ON events (executedAt);
+    CREATE INDEX IF NOT EXISTS idx_events_category_executedAt
+      ON events (category, executedAt);
 
     CREATE TABLE IF NOT EXISTS quiz_answers (
       question         TEXT PRIMARY KEY,
@@ -176,6 +202,15 @@ export function initDb(): void {
       useCount         INTEGER NOT NULL DEFAULT 1
     );
   `);
+
+  const eventColumns = db
+    .prepare("PRAGMA table_info(events)")
+    .all()
+    .map((row) => (row as { name: string }).name);
+  if (!eventColumns.includes("succeeded"))
+    db.exec(
+      "ALTER TABLE events ADD COLUMN succeeded INTEGER NOT NULL DEFAULT 1",
+    );
 
   for (const table of ["totals", "daily"]) {
     let columns = db
@@ -278,13 +313,13 @@ export function initDb(): void {
         COALESCE(SUM(quizApiCalls), 0)  AS quizApiCalls
       FROM daily WHERE date >= ?
     `),
-    insertBalanceEvent: db.prepare(`
-      INSERT INTO balance_events (executedAt, command, category, delta, balanceAfter, responseText)
-      VALUES (@executedAt, @command, @category, @delta, @balanceAfter, @responseText)
+    insertEvent: db.prepare(`
+      INSERT INTO events (executedAt, command, category, delta, balanceAfter, succeeded, responseText)
+      VALUES (@executedAt, @command, @category, @delta, @balanceAfter, @succeeded, @responseText)
     `),
-    getBalanceEvents: db.prepare(`
-      SELECT id, executedAt, command, category, delta, balanceAfter, responseText
-      FROM balance_events
+    getEvents: db.prepare(`
+      SELECT id, executedAt, command, category, delta, balanceAfter, succeeded, responseText
+      FROM events
       WHERE executedAt >= ? AND executedAt <= ?
       ORDER BY executedAt ASC, id ASC
     `),
@@ -352,20 +387,19 @@ export function record(d: StatsRow): void {
   addToStats(cache.week, d);
 }
 
-export function recordBalanceChange(event: NewBalanceEvent): void {
-  queries.insertBalanceEvent.run(
-    event as unknown as Record<string, SQLInputValue>,
-  );
-  log.debug("Balance change recorded", {
+export function recordEvent(event: NewEvent): void {
+  queries.insertEvent.run(event as unknown as Record<string, SQLInputValue>);
+  log.debug("Event recorded", {
     command: event.command,
     category: event.category,
     delta: event.delta,
     balanceAfter: event.balanceAfter,
+    succeeded: event.succeeded === 1,
   });
 }
 
-export function getBalanceEvents(from: string, to: string): BalanceEvent[] {
-  return queries.getBalanceEvents.all(from, to) as unknown as BalanceEvent[];
+export function getEvents(from: string, to: string): Event[] {
+  return queries.getEvents.all(from, to) as unknown as Event[];
 }
 
 export function getQuizAnswer(question: string): string | null {

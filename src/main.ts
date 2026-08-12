@@ -17,6 +17,7 @@ import { runQuizPlan } from "./quiz.js";
 import {
   displayStats,
   playerInfo,
+  recordCommandFailure,
   recordCommandResult,
   setLastCommand,
   updateFromRank,
@@ -175,6 +176,7 @@ async function executeCommand(command: Command): Promise<ExecutedCommand> {
     });
     return executed;
   } catch (err) {
+    recordCommandFailure(command, err);
     log.error("Command execution failed", err, { command });
     return {
       succeeded: false,

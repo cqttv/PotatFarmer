@@ -1,7 +1,7 @@
 import { Actions, Rank, type RankValue } from "./plans.js";
 import {
   record,
-  recordBalanceChange,
+  recordEvent,
   addToStats,
   cache,
   ZERO_STATS,
@@ -154,6 +154,8 @@ const TRACKED_COMMANDS: ReadonlySet<string> = new Set([
 function balanceCategory(command: string): string {
   if (command === Actions.STEAL) return "steal";
   if (command === Actions.FARM) return "harvest";
+  if (command === Actions.RANKUP) return "rankup";
+  if (command === Actions.PRESTIGE) return "prestige";
   if (
     command === Actions.CDR ||
     command === Actions.EAT ||
@@ -197,7 +199,18 @@ export function recordCommandResult(
   responseText: string | null,
   isError: boolean,
 ): void {
-  if (responseText === null) return;
+  if (responseText === null) {
+    recordEvent({
+      executedAt: new Date().toISOString(),
+      command,
+      category: balanceCategory(command),
+      delta: 0,
+      balanceAfter: playerInfo.potatoes,
+      succeeded: 0,
+      responseText: "Command returned no response",
+    });
+    return;
+  }
   if (COOLDOWN_REGEX.test(responseText)) {
     log.debug("Ignoring cooldown response for stats", { command });
     return;
@@ -210,19 +223,20 @@ export function recordCommandResult(
   const balanceChange = parseBalanceChange(responseText);
   if (balanceChange) {
     playerInfo.potatoes = balanceChange.balanceAfter;
-    recordBalanceChange({
-      executedAt: new Date().toISOString(),
-      command,
-      category: balanceCategory(command),
-      delta: balanceChange.delta,
-      balanceAfter: balanceChange.balanceAfter,
-      responseText: responseText.slice(0, 500),
-    });
   }
-  if (!TRACKED_COMMANDS.has(command)) return;
 
   const delta =
     balanceChange?.delta ?? parseDelta(command, responseText, isError);
+  recordEvent({
+    executedAt: new Date().toISOString(),
+    command,
+    category: balanceCategory(command),
+    delta,
+    balanceAfter: balanceChange?.balanceAfter ?? playerInfo.potatoes,
+    succeeded: isError ? 0 : 1,
+    responseText: responseText.slice(0, 500),
+  });
+  if (!TRACKED_COMMANDS.has(command)) return;
 
   const increment: StatsRow = {
     farm: command === Actions.FARM ? delta : 0,
@@ -247,6 +261,18 @@ export function recordCommandResult(
 
   addToStats(sessionTotals, increment);
   log.debug("Command stats recorded", { command, isError, delta, increment });
+}
+
+export function recordCommandFailure(command: string, error: unknown): void {
+  recordEvent({
+    executedAt: new Date().toISOString(),
+    command,
+    category: balanceCategory(command),
+    delta: 0,
+    balanceAfter: playerInfo.potatoes,
+    succeeded: 0,
+    responseText: error instanceof Error ? error.message : String(error),
+  });
 }
 
 function formatNumber(n: number): string {
