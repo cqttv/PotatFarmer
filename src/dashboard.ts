@@ -9,15 +9,15 @@ export const DASHBOARD_HTML = `<!DOCTYPE html>
 :root { color-scheme:dark; --bg:#090b0c; --panel:#0f1214; --panel2:#131719; --line:#273036; --muted:#77838a; --text:#d5dcdf; --yellow:#ffda44; --cyan:#2dd4d1; --green:#4ade80; --red:#fb7185 }
 * { margin:0; padding:0; box-sizing:border-box }
 body { background:var(--bg); color:var(--text); font:13px/1.55 'Courier New',monospace; padding:18px }
-button,input { font:inherit }
-button:focus-visible,input:focus-visible { outline:2px solid var(--cyan); outline-offset:2px }
+button,input,select { font:inherit }
+button:focus-visible,input:focus-visible,select:focus-visible { outline:2px solid var(--cyan); outline-offset:2px }
 #page { display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:16px; max-width:1720px; margin:0 auto }
 #charts,#box { min-width:0; border:1px solid var(--line); background:var(--panel); align-self:start }
 .hdr { display:flex; align-items:center; justify-content:space-between; min-height:44px; padding:8px 12px; color:var(--yellow); font-weight:bold; border-bottom:1px solid var(--line); letter-spacing:1.6px }
 .hdr small { color:var(--muted); font-weight:normal; letter-spacing:0 }
 .toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:end; padding:10px 12px; border-bottom:1px solid var(--line); background:#0c0f10 }
 .toolbar label { color:var(--muted); display:grid; gap:3px; font-size:11px; text-transform:uppercase; letter-spacing:.6px }
-.toolbar input,.toolbar button,.chart-action { background:#111618; color:var(--text); border:1px solid #354047; padding:6px 9px; min-height:32px }
+.toolbar input,.toolbar select,.toolbar button,.chart-action { background:#111618; color:var(--text); border:1px solid #354047; padding:6px 9px; min-height:32px }
 .toolbar button,.chart-action { color:var(--yellow); cursor:pointer }
 .toolbar button:hover,.chart-action:hover,.toolbar button.active { background:#222a2d; border-color:#64737b }
 .toolbar button:disabled { color:#4f5a60; cursor:not-allowed; background:#0d1112; border-color:#273036 }
@@ -36,7 +36,7 @@ button:focus-visible,input:focus-visible { outline:2px solid var(--cyan); outlin
 .plot-title { color:var(--cyan); font-size:13px; font-weight:bold }
 .plot-meta { color:var(--muted); font-size:10px; margin-left:7px }
 .legend { display:inline-flex; flex-wrap:wrap; gap:7px; margin-left:10px; color:var(--muted); font-size:10px; font-weight:normal }
-.legend i { display:inline-block; width:7px; height:7px; margin-right:3px; border-radius:50% }
+.legend i { display:inline-block; width:8px; height:8px; margin-right:3px; border-radius:50% }
 .plot-tools { display:flex; gap:5px }
 .chart-action { min-height:26px; padding:3px 7px; color:var(--muted); font-size:11px }
 .plot canvas { display:block; width:100%; height:300px; cursor:crosshair; touch-action:none }
@@ -78,7 +78,10 @@ body.modal-open { overflow:hidden }
       <button id="apply" type="button">Apply</button>
       <span class="divider"></span>
       <button id="resetZoom" type="button" disabled>Reset zoom</button>
-      <span class="hint">Drag to zoom · wheel to zoom · Shift+drag to pan · double-click to reset</span>
+      <label>Event <select id="categoryFilter"><option value="all">All types</option><option value="harvest">Harvest</option><option value="steal">Steal</option><option value="spending">Spending</option><option value="quiz">Quiz</option><option value="rankup">Rank up</option><option value="prestige">Prestige</option><option value="other">Other</option></select></label>
+      <label>Outcome <select id="outcomeFilter"><option value="all">All outcomes</option><option value="success">Completed</option><option value="failure">Failed</option></select></label>
+      <label>Impact <select id="impactFilter"><option value="all">Any impact</option><option value="gain">Gains</option><option value="loss">Losses</option><option value="neutral">No change</option></select></label>
+      <span class="hint">Drag zoom · wheel zoom · Shift+drag pan</span>
     </div>
     <section class="kpis" id="kpis" aria-label="Selected window metrics"></section>
     <div class="grid">
@@ -153,7 +156,9 @@ let pinned = null
 let drag = null
 let expandedId = null
 let chartFrame = 0
+let hoverFrame = 0
 let suppressClick = false
+let eventsController = null
 const renderedPoints = {}
 function localInputValue(date) { return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0,16) }
 function updateRangeInputs(hours) {
@@ -168,7 +173,11 @@ function niceNum(n) {
   if (Math.abs(n) >= 1000) return (n / 1000).toFixed(1).replace(/[.]0$/, '') + 'k'
   return String(Math.round(n))
 }
-function visibleEvents() { const a = viewFrom.getTime(), b = viewTo.getTime(); return latestEvents.filter(e => { const t = Date.parse(e.executedAt); return t >= a && t <= b }) }
+function eventMatchesFilters(e) {
+  const category=document.getElementById('categoryFilter').value,outcome=document.getElementById('outcomeFilter').value,impact=document.getElementById('impactFilter').value
+  return (category==='all'||e.category===category) && (outcome==='all'||(outcome==='success'&&e.succeeded)||(outcome==='failure'&&!e.succeeded)) && (impact==='all'||(impact==='gain'&&e.delta>0)||(impact==='loss'&&e.delta<0)||(impact==='neutral'&&e.delta===0))
+}
+function visibleEvents() { const a=viewFrom.getTime(),b=viewTo.getTime();return latestEvents.filter(e=>{const t=Date.parse(e.executedAt);return t>=a&&t<=b&&eventMatchesFilters(e)}) }
 function rangeLabel(from, to) {
   const span = to.getTime() - from.getTime()
   if (span < 86400000) return timeFmt.format(from) + ' – ' + timeFmt.format(to)
@@ -228,8 +237,13 @@ function nearestPoint(points, target) {
   return best && (best.barW || bestDist <= 14) ? best : null
 }
 function queueRedraw() {
+  cancelAnimationFrame(hoverFrame)
   cancelAnimationFrame(chartFrame)
   chartFrame = requestAnimationFrame(redrawCharts)
+}
+function queueChartRedraw(id) {
+  cancelAnimationFrame(hoverFrame)
+  hoverFrame=requestAnimationFrame(()=>{hideTip();const def=chartDefs.find(item=>item.id===id);if(def)drawChart(def,visibleEvents(),viewFrom,viewTo)})
 }
 function redrawCharts() {
   hideTip(); updateAnalytics()
@@ -245,7 +259,6 @@ function drawChart(def, events, from, to) {
   const start = from.getTime(), end = to.getTime()
   function x(t) { return pad.l + ((t-start) / Math.max(1,end-start)) * pw }
   const points = events.filter(def.filter).map(e => ({ id:e.id, t:Date.parse(e.executedAt), y:def.mode === 'balance' ? e.balanceAfter : e.delta, delta:e.delta, balanceAfter:e.balanceAfter, succeeded:e.succeeded, command:e.command, category:e.category, executedAt:e.executedAt }))
-  renderedPoints[def.id] = points
   let minY, maxY
   if (points.length) { minY = points.reduce((smallest,p) => Math.min(smallest,p.y),points[0].y); maxY = points.reduce((largest,p) => Math.max(largest,p.y),points[0].y) } else { minY = -1; maxY = 1 }
   if (def.mode === 'delta') { minY = Math.min(minY,0); maxY = Math.max(maxY,0) }
@@ -266,6 +279,8 @@ function drawChart(def, events, from, to) {
   ctx.textAlign = 'left'
   if (!points.length) { ctx.fillStyle='#657178'; ctx.textAlign='center'; ctx.fillText('No transactions in this window',w/2,h/2); return }
   points.forEach(p => { p.px=x(p.t); p.py=y(p.y) })
+  const stride=def.style==='line'?Math.max(1,Math.ceil(points.length/Math.max(1,pw*2))):1,displayPoints=stride===1?points:points.filter((p,i)=>i%stride===0||i===points.length-1)
+  renderedPoints[def.id] = displayPoints
   const zeroY = y(0)
   if (zeroY >= pad.t && zeroY <= pad.t+ph) { ctx.strokeStyle='#69777e'; ctx.beginPath(); ctx.moveTo(pad.l,zeroY); ctx.lineTo(w-pad.r,zeroY); ctx.stroke() }
   ctx.save(); ctx.beginPath(); ctx.rect(pad.l,pad.t,pw,ph); ctx.clip()
@@ -275,11 +290,11 @@ function drawChart(def, events, from, to) {
     ctx.globalAlpha=1
   } else {
     const gradient=ctx.createLinearGradient(0,pad.t,0,pad.t+ph); gradient.addColorStop(0,'rgba(255,218,68,.2)'); gradient.addColorStop(1,'rgba(255,218,68,0)')
-    ctx.beginPath(); points.forEach((p,i) => { if(i===0)ctx.moveTo(p.px,p.py);else ctx.lineTo(p.px,p.py) }); ctx.lineTo(points[points.length-1].px,pad.t+ph); ctx.lineTo(points[0].px,pad.t+ph); ctx.closePath(); ctx.fillStyle=gradient; ctx.fill()
-    ctx.beginPath(); points.forEach((p,i) => { if(i===0)ctx.moveTo(p.px,p.py);else ctx.lineTo(p.px,p.py) }); ctx.strokeStyle=def.color; ctx.lineWidth=2; ctx.stroke()
-    points.forEach(p => { ctx.fillStyle=eventColor(p.category);ctx.beginPath();ctx.arc(p.px,p.py,p.category==='rankup'||p.category==='prestige'?5:3.5,0,Math.PI*2);ctx.fill();if(!p.succeeded){ctx.strokeStyle='#fb7185';ctx.lineWidth=1.5;ctx.stroke()} })
+    ctx.beginPath(); displayPoints.forEach((p,i) => { if(i===0)ctx.moveTo(p.px,p.py);else ctx.lineTo(p.px,p.py) }); ctx.lineTo(displayPoints[displayPoints.length-1].px,pad.t+ph); ctx.lineTo(displayPoints[0].px,pad.t+ph); ctx.closePath(); ctx.fillStyle=gradient; ctx.fill()
+    ctx.beginPath(); displayPoints.forEach((p,i) => { if(i===0)ctx.moveTo(p.px,p.py);else ctx.lineTo(p.px,p.py) }); ctx.strokeStyle=def.color; ctx.lineWidth=2; ctx.stroke()
+    displayPoints.forEach(p => { ctx.fillStyle=eventColor(p.category);ctx.beginPath();ctx.arc(p.px,p.py,p.category==='rankup'||p.category==='prestige'?5:3.5,0,Math.PI*2);ctx.fill();if(!p.succeeded){ctx.strokeStyle='#fb7185';ctx.lineWidth=1.5;ctx.stroke()} })
   }
-  const active = pinned && pinned.chartId===def.id ? points.find(p=>p.id===pinned.eventId) || null : hover && hover.id===def.id ? nearestPoint(points,hover) : null
+  const active = pinned && pinned.chartId===def.id ? displayPoints.find(p=>p.id===pinned.eventId) || null : hover && hover.id===def.id ? nearestPoint(displayPoints,hover) : null
   if (hover && hover.id===def.id) { ctx.strokeStyle='#849198'; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(hover.x,pad.t); ctx.lineTo(hover.x,pad.t+ph); ctx.stroke(); ctx.setLineDash([]) }
   if (active) { ctx.strokeStyle='#fff'; ctx.lineWidth=2; if(active.barW)ctx.strokeRect(active.barX-2,active.barY-2,active.barW+4,active.barH+4);else { ctx.fillStyle='#131719'; ctx.beginPath();ctx.arc(active.px,active.py,6,0,Math.PI*2);ctx.fill();ctx.stroke() } }
   ctx.restore()
@@ -298,18 +313,20 @@ async function refreshCharts(resetView) {
   if (from>=to) { document.getElementById('foot').textContent='The start time must be before the end time'; return }
   const qs='?from='+encodeURIComponent(from.toISOString())+'&to='+encodeURIComponent(to.toISOString())
   try {
-    const response=await fetch('/events'+qs)
+    if(eventsController)eventsController.abort();eventsController=new AbortController()
+    const response=await fetch('/events'+qs,{signal:eventsController.signal})
     if(!response.ok)throw new Error('events request failed ('+response.status+')')
     const payload=await response.json(), wasAtDefault=viewFrom.getTime()===resetFrom.getTime() && viewTo.getTime()===resetTo.getTime()
     latestEvents=payload.events || []; queryFrom=from; queryTo=to
     if(autoFitData && latestEvents.length){
-      const first=Date.parse(latestEvents[0].executedAt),last=Date.parse(latestEvents[latestEvents.length-1].executedAt),dataSpan=Math.max(MIN_WINDOW_MS,last-first),padding=Math.max(3600000,dataSpan*.05)
+      const times=latestEvents.map(e=>Date.parse(e.executedAt)),first=times.reduce((a,b)=>Math.min(a,b)),last=times.reduce((a,b)=>Math.max(a,b)),dataSpan=Math.max(MIN_WINDOW_MS,last-first),padding=Math.max(60000,dataSpan*.02)
       resetFrom=new Date(Math.max(from.getTime(),first-padding));resetTo=new Date(Math.min(to.getTime(),last+padding))
+      if(liveRangeHours==='all'){queryFrom=new Date(resetFrom);queryTo=new Date(resetTo)}
     } else { resetFrom=new Date(from);resetTo=new Date(to) }
     if(resetView || wasAtDefault || liveRangeHours!==null){viewFrom=new Date(resetFrom);viewTo=new Date(resetTo)}
     else clampView(viewFrom.getTime(),viewTo.getTime())
     queueRedraw()
-  } catch(e) { document.getElementById('foot').textContent='error: '+String(e) }
+  } catch(e) { if(e.name!=='AbortError')document.getElementById('foot').textContent='error: '+String(e) }
 }
 async function refresh() {
   try {
@@ -338,6 +355,7 @@ document.getElementById('from').addEventListener('input',()=>{liveRangeHours=nul
 document.getElementById('to').addEventListener('input',()=>{liveRangeHours=null;autoFitData=false})
 document.getElementById('apply').addEventListener('click',()=>{liveRangeHours=null;autoFitData=false;refreshCharts(true)})
 document.getElementById('resetZoom').addEventListener('click',resetZoom)
+document.querySelectorAll('#categoryFilter,#outcomeFilter,#impactFilter').forEach(el=>el.addEventListener('change',()=>{pinned=null;hover=null;queueRedraw()}))
 document.querySelectorAll('[data-expand]').forEach(btn=>btn.addEventListener('click',()=>toggleExpand(btn.dataset.expand)))
 chartDefs.forEach(def=>{
   const canvas=document.getElementById(def.id)
@@ -351,7 +369,7 @@ chartDefs.forEach(def=>{
       return
     }
     const ratio=Math.max(0,Math.min(1,(p.x-chartPad.l)/Math.max(1,p.width-chartPad.l-chartPad.r)))
-    hover={id:def.id,x:p.x,y:p.y,t:viewFrom.getTime()+(viewTo-viewFrom)*ratio};queueRedraw()
+    hover={id:def.id,x:p.x,y:p.y,t:viewFrom.getTime()+(viewTo-viewFrom)*ratio};queueChartRedraw(def.id)
   })
   canvas.addEventListener('pointerup',e=>{
     if(!drag||drag.id!==def.id)return
@@ -361,9 +379,9 @@ chartDefs.forEach(def=>{
     drag=null
   })
   canvas.addEventListener('pointercancel',()=>{drag=null;const selection=document.getElementById('selection');if(selection)selection.remove()})
-  canvas.addEventListener('mouseleave',()=>{if(!drag){hover=null;queueRedraw()}})
+  canvas.addEventListener('mouseleave',()=>{if(!drag){hover=null;queueChartRedraw(def.id)}})
   canvas.addEventListener('wheel',e=>{e.preventDefault();const p=position(e),pw=Math.max(1,p.width-chartPad.l-chartPad.r),ratio=Math.max(0,Math.min(1,(p.x-chartPad.l)/pw)),start=viewFrom.getTime(),end=viewTo.getTime(),anchor=start+(end-start)*ratio,factor=e.deltaY>0?1.35:.72;clampView(anchor-(anchor-start)*factor,anchor+(end-anchor)*factor)},{passive:false})
-  canvas.addEventListener('click',e=>{if(suppressClick){suppressClick=false;return}const p=position(e),point=nearestPoint(renderedPoints[def.id]||[],p);pinned=point?{chartId:def.id,eventId:point.id}:null;hover=point?{id:def.id,x:p.x,y:p.y}:null;queueRedraw()})
+  canvas.addEventListener('click',e=>{if(suppressClick){suppressClick=false;return}const p=position(e),point=nearestPoint(renderedPoints[def.id]||[],p);pinned=point?{chartId:def.id,eventId:point.id}:null;hover=point?{id:def.id,x:p.x,y:p.y}:null;queueChartRedraw(def.id)})
   canvas.addEventListener('dblclick',resetZoom)
 })
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&expandedId)toggleExpand(expandedId)})
