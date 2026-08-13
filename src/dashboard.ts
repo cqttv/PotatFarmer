@@ -83,18 +83,17 @@ body.modal-open { overflow:hidden }
       <button id="apply" type="button">Apply</button>
       <span class="divider"></span>
       <button id="resetZoom" type="button" disabled>Reset zoom</button>
-      <label>Event <select id="categoryFilter"><option value="all">All types</option><option value="harvest">Harvest</option><option value="steal">Steal</option><option value="spending">Spending</option><option value="quiz">Quiz</option><option value="rankup">Rank up</option><option value="prestige">Prestige</option><option value="other">Other</option></select></label>
-      <label>Outcome <select id="outcomeFilter"><option value="all">All outcomes</option><option value="success">Completed</option><option value="failure">Failed</option></select></label>
+      <label>Event <select id="categoryFilter"><option value="all">All types</option><option value="harvest">Harvest</option><option value="steal">Steal</option><option value="spending">Spending</option><option value="quiz">Quiz reward</option><option value="quiz_failure">Quiz failure</option><option value="rankup">Rank up</option><option value="prestige">Prestige</option><option value="other">Other</option></select></label>
       <label>Impact <select id="impactFilter"><option value="all">Any impact</option><option value="gain">Gains</option><option value="loss">Losses</option><option value="neutral">No change</option></select></label>
       <span class="hint">Drag zoom · wheel zoom · Shift+drag pan</span>
     </div>
     <section class="kpis" id="kpis" aria-label="Selected window metrics"></section>
     <div class="grid">
-      <section class="plot plot-wide" data-chart="overview"><div class="plot-head"><div><span class="plot-title">Balance &amp; Activity</span><span class="plot-meta" id="overviewMeta"></span><span class="legend"><span><i style="background:#4ade80"></i>Harvest</span><span><i style="background:#38bdf8"></i>Steal</span><span><i style="background:#fb7185"></i>Spend</span><span><i style="background:#c084fc"></i>Quiz</span><span><i style="background:#fb923c"></i>Rank</span><span><i style="background:#ffda44"></i>Prestige</span></span></div><div class="plot-tools"><button class="chart-action" data-expand="overview" type="button" aria-label="Expand Balance and Activity">Expand</button></div></div><canvas id="overview"></canvas></section>
+      <section class="plot plot-wide" data-chart="overview"><div class="plot-head"><div><span class="plot-title">Balance &amp; Activity</span><span class="plot-meta" id="overviewMeta"></span><span class="legend"><span><i style="background:#4ade80"></i>Harvest</span><span><i style="background:#38bdf8"></i>Steal</span><span><i style="background:#fb7185"></i>Spend</span><span><i style="background:#c084fc"></i>Quiz</span><span><i style="background:#ef4444"></i>Quiz fail</span><span><i style="background:#fb923c"></i>Rank</span><span><i style="background:#ffda44"></i>Prestige</span></span></div><div class="plot-tools"><button class="chart-action" data-expand="overview" type="button" aria-label="Expand Balance and Activity">Expand</button></div></div><canvas id="overview"></canvas></section>
       <section class="plot" data-chart="steal"><div class="plot-head"><div><span class="plot-title">Steal P&amp;L</span><span class="plot-meta" id="stealMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="steal" type="button" aria-label="Expand Steal P&amp;L">Expand</button></div></div><canvas id="steal"></canvas></section>
       <section class="plot" data-chart="harvest"><div class="plot-head"><div><span class="plot-title">Harvest Yield</span><span class="plot-meta" id="harvestMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="harvest" type="button" aria-label="Expand Harvest Yield">Expand</button></div></div><canvas id="harvest"></canvas></section>
       <section class="plot" data-chart="spending"><div class="plot-head"><div><span class="plot-title">Spending</span><span class="plot-meta" id="spendingMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="spending" type="button" aria-label="Expand Spending">Expand</button></div></div><canvas id="spending"></canvas></section>
-      <section class="plot" data-chart="quiz"><div class="plot-head"><div><span class="plot-title">Quiz Rewards</span><span class="plot-meta" id="quizMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="quiz" type="button" aria-label="Expand Quiz Rewards">Expand</button></div></div><canvas id="quiz"></canvas></section>
+      <section class="plot" data-chart="quiz"><div class="plot-head"><div><span class="plot-title">Quiz Outcomes</span><span class="plot-meta" id="quizMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="quiz" type="button" aria-label="Expand Quiz Outcomes">Expand</button></div></div><canvas id="quiz"></canvas></section>
     </div>
     <div id="chartLoading" role="status" aria-live="polite" hidden><span class="spinner" aria-hidden="true"></span><span>Loading analytics&hellip;</span></div>
   </main>
@@ -144,7 +143,7 @@ const chartDefs = [
   { id:'steal', filter:e => e.category === 'steal', mode:'delta', style:'bar', color:'#2dd4d1' },
   { id:'harvest', filter:e => e.category === 'harvest', mode:'delta', style:'bar', color:'#2dd4d1' },
   { id:'spending', filter:e => e.category === 'spending', mode:'delta', style:'bar', color:'#2dd4d1' },
-  { id:'quiz', filter:e => e.category === 'quiz', mode:'delta', style:'bar', color:'#2dd4d1' },
+  { id:'quiz', filter:e => e.category === 'quiz' || e.category === 'quiz_failure', mode:'delta', style:'bar', color:'#2dd4d1' },
 ]
 const chartPad = { l:62, r:18, t:20, b:38 }
 const MIN_WINDOW_MS = 10000
@@ -182,8 +181,8 @@ function niceNum(n) {
   return String(Math.round(n))
 }
 function eventMatchesFilters(e) {
-  const category=document.getElementById('categoryFilter').value,outcome=document.getElementById('outcomeFilter').value,impact=document.getElementById('impactFilter').value
-  return (category==='all'||e.category===category) && (outcome==='all'||(outcome==='success'&&e.succeeded)||(outcome==='failure'&&!e.succeeded)) && (impact==='all'||(impact==='gain'&&e.delta>0)||(impact==='loss'&&e.delta<0)||(impact==='neutral'&&e.delta===0))
+  const category=document.getElementById('categoryFilter').value,impact=document.getElementById('impactFilter').value
+  return (category==='all'||e.category===category) && (impact==='all'||(impact==='gain'&&e.delta>0)||(impact==='loss'&&e.delta<0)||(impact==='neutral'&&e.delta===0))
 }
 function visibleEvents() { const a=viewFrom.getTime(),b=viewTo.getTime();return latestEvents.filter(e=>{const t=Date.parse(e.executedAt);return t>=a&&t<=b&&eventMatchesFilters(e)}) }
 function rangeLabel(from, to) {
@@ -193,7 +192,7 @@ function rangeLabel(from, to) {
 }
 function kpi(label, value, note, c) { return '<div class="kpi"><div class="kpi-label">' + label + '</div><div class="kpi-value ' + (c || '') + '">' + value + '</div><div class="kpi-note">' + note + '</div></div>' }
 function updateAnalytics() {
-  const events = visibleEvents(), transactions = events.filter(e => e.category !== 'rankup' && e.category !== 'prestige'), deltas = transactions.map(e => e.delta), net = deltas.reduce((a,b) => a + b, 0)
+  const events = visibleEvents(), transactions = events.filter(e => e.category !== 'rankup' && e.category !== 'prestige' && e.category !== 'quiz_failure'), deltas = transactions.map(e => e.delta), net = deltas.reduce((a,b) => a + b, 0)
   const gains = deltas.filter(n => n > 0), losses = deltas.filter(n => n < 0), positive = gains.length
   const avg = transactions.length ? net / transactions.length : 0
   const best = gains.reduce((largest,n) => Math.max(largest,n),0), worst = losses.reduce((smallest,n) => Math.min(smallest,n),0)
@@ -221,17 +220,16 @@ function setLoading(value) {
   document.getElementById('charts').setAttribute('aria-busy',String(value))
 }
 function categoryLabel(category) {
-  return { harvest:'Harvest', steal:'Steal', spending:'Spending', quiz:'Quiz', rankup:'Rank up', prestige:'Prestige', other:'Other' }[category] || category
+  return { harvest:'Harvest', steal:'Steal', spending:'Spending', quiz:'Quiz reward', quiz_failure:'Quiz failure', rankup:'Rank up', prestige:'Prestige', other:'Other' }[category] || category
 }
 function eventColor(category) {
-  return { harvest:'#4ade80', steal:'#38bdf8', spending:'#fb7185', quiz:'#c084fc', rankup:'#fb923c', prestige:'#ffda44' }[category] || '#94a3b8'
+  return { harvest:'#4ade80', steal:'#38bdf8', spending:'#fb7185', quiz:'#c084fc', quiz_failure:'#ef4444', rankup:'#fb923c', prestige:'#ffda44' }[category] || '#94a3b8'
 }
 function renderTip(point, canvas) {
   const tip = document.getElementById('tip'), changeClass = cls(point.delta)
   tip.innerHTML = '<div class="t">' + esc(dateTimeFmt.format(new Date(point.executedAt))) + '</div>' +
     '<div><span class="k">Command:</span> ' + esc(point.command) + '</div>' +
     '<div><span class="k">Event:</span> ' + esc(categoryLabel(point.category)) + '</div>' +
-    '<div><span class="k">Outcome:</span> <span class="' + (point.succeeded ? 'green' : 'red') + '">' + (point.succeeded ? 'Completed' : 'Failed') + '</span></div>' +
     '<div><span class="k">Change:</span> <span class="' + changeClass + '">' + signed(point.delta) + '</span></div>' +
     '<div><span class="k">Balance after:</span> ' + fmt(point.balanceAfter) + '</div>'
   tip.hidden = false
@@ -273,7 +271,7 @@ function drawChart(def, events, from, to) {
   ctx.fillStyle = '#131719'; ctx.fillRect(0,0,w,h)
   const start = from.getTime(), end = to.getTime()
   function x(t) { return pad.l + ((t-start) / Math.max(1,end-start)) * pw }
-  const points = events.filter(def.filter).map(e => ({ id:e.id, t:Date.parse(e.executedAt), y:def.mode === 'balance' ? e.balanceAfter : e.delta, delta:e.delta, balanceAfter:e.balanceAfter, succeeded:e.succeeded, command:e.command, category:e.category, executedAt:e.executedAt }))
+  const points = events.filter(def.filter).map(e => ({ id:e.id, t:Date.parse(e.executedAt), y:def.mode === 'balance' ? e.balanceAfter : e.delta, delta:e.delta, balanceAfter:e.balanceAfter, command:e.command, category:e.category, executedAt:e.executedAt }))
   let minY, maxY
   if (points.length) { minY = points.reduce((smallest,p) => Math.min(smallest,p.y),points[0].y); maxY = points.reduce((largest,p) => Math.max(largest,p.y),points[0].y) } else { minY = -1; maxY = 1 }
   if (def.mode === 'delta') { minY = Math.min(minY,0); maxY = Math.max(maxY,0) }
@@ -301,13 +299,13 @@ function drawChart(def, events, from, to) {
   ctx.save(); ctx.beginPath(); ctx.rect(pad.l,pad.t,pw,ph); ctx.clip()
   if (def.style === 'bar') {
     const bw = Math.max(3,Math.min(20,pw/Math.max(points.length*1.5,16)))
-    points.forEach(p => { const top=Math.min(p.py,zeroY), height=Math.max(1,Math.abs(p.py-zeroY)); p.barX=p.px-bw/2; p.barY=top; p.barW=bw; p.barH=height; ctx.fillStyle=!p.succeeded||p.delta<0?'#fb7185':'#4ade80'; ctx.globalAlpha=.82; ctx.fillRect(p.barX,p.barY,bw,height) })
+    points.forEach(p => { const marker=p.category==='quiz_failure',top=marker?zeroY-3:Math.min(p.py,zeroY),height=marker?6:Math.max(1,Math.abs(p.py-zeroY));p.barX=p.px-bw/2;p.barY=top;p.barW=bw;p.barH=height;ctx.fillStyle=marker?eventColor(p.category):p.delta<0?'#fb7185':'#4ade80';ctx.globalAlpha=.82;ctx.fillRect(p.barX,p.barY,bw,height) })
     ctx.globalAlpha=1
   } else {
     const gradient=ctx.createLinearGradient(0,pad.t,0,pad.t+ph); gradient.addColorStop(0,'rgba(255,218,68,.2)'); gradient.addColorStop(1,'rgba(255,218,68,0)')
     ctx.beginPath(); displayPoints.forEach((p,i) => { if(i===0)ctx.moveTo(p.px,p.py);else ctx.lineTo(p.px,p.py) }); ctx.lineTo(displayPoints[displayPoints.length-1].px,pad.t+ph); ctx.lineTo(displayPoints[0].px,pad.t+ph); ctx.closePath(); ctx.fillStyle=gradient; ctx.fill()
     ctx.beginPath(); displayPoints.forEach((p,i) => { if(i===0)ctx.moveTo(p.px,p.py);else ctx.lineTo(p.px,p.py) }); ctx.strokeStyle=def.color; ctx.lineWidth=2; ctx.stroke()
-    displayPoints.forEach(p => { ctx.fillStyle=eventColor(p.category);ctx.beginPath();ctx.arc(p.px,p.py,p.category==='rankup'||p.category==='prestige'?5:3.5,0,Math.PI*2);ctx.fill();if(!p.succeeded){ctx.strokeStyle='#fb7185';ctx.lineWidth=1.5;ctx.stroke()} })
+    displayPoints.forEach(p => { ctx.fillStyle=eventColor(p.category);ctx.beginPath();ctx.arc(p.px,p.py,p.category==='rankup'||p.category==='prestige'?5:3.5,0,Math.PI*2);ctx.fill() })
   }
   const active = pinned && pinned.chartId===def.id ? displayPoints.find(p=>p.id===pinned.eventId) || null : hover && hover.id===def.id ? nearestPoint(displayPoints,hover) : null
   if (hover && hover.id===def.id) { ctx.strokeStyle='#849198'; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(hover.x,pad.t); ctx.lineTo(hover.x,pad.t+ph); ctx.stroke(); ctx.setLineDash([]) }
@@ -378,7 +376,7 @@ document.getElementById('from').addEventListener('input',()=>{liveRangeHours=nul
 document.getElementById('to').addEventListener('input',()=>{liveRangeHours=null;autoFitData=false})
 document.getElementById('apply').addEventListener('click',()=>{liveRangeHours=null;autoFitData=false;refreshCharts(true)})
 document.getElementById('resetZoom').addEventListener('click',resetZoom)
-document.querySelectorAll('#categoryFilter,#outcomeFilter,#impactFilter').forEach(el=>el.addEventListener('change',()=>{setLoading(true);pinned=null;hover=null;requestAnimationFrame(()=>requestAnimationFrame(()=>{redrawCharts();setLoading(false)}))}))
+document.querySelectorAll('#categoryFilter,#impactFilter').forEach(el=>el.addEventListener('change',()=>{setLoading(true);pinned=null;hover=null;requestAnimationFrame(()=>requestAnimationFrame(()=>{redrawCharts();setLoading(false)}))}))
 document.querySelectorAll('[data-expand]').forEach(btn=>btn.addEventListener('click',()=>toggleExpand(btn.dataset.expand)))
 chartDefs.forEach(def=>{
   const canvas=document.getElementById(def.id)

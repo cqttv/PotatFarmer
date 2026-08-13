@@ -46,10 +46,9 @@ function failQuiz(): QuizResult {
   recordEvent({
     executedAt: new Date().toISOString(),
     command: Actions.QUIZ,
-    category: "quiz",
+    category: "quiz_failure",
     delta: 0,
     balanceAfter: playerInfo.potatoes,
-    succeeded: 0,
     responseText: "Quiz attempt failed",
   });
   recordQuizStats({ quizFailures: 1 });
@@ -98,7 +97,6 @@ async function recordSuccess(
     category: "quiz",
     delta: reward,
     balanceAfter: playerInfo.potatoes,
-    succeeded: 1,
     responseText: `Correct quiz answer: ${answer}`,
   });
   saveQuizAnswer(questionKey, answer);

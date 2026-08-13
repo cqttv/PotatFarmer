@@ -200,18 +200,7 @@ export function recordCommandResult(
   isError: boolean,
 ): void {
   if (command === Actions.STATUS) return;
-  if (responseText === null) {
-    recordEvent({
-      executedAt: new Date().toISOString(),
-      command,
-      category: eventCategory(command),
-      delta: 0,
-      balanceAfter: playerInfo.potatoes,
-      succeeded: 0,
-      responseText: "Command returned no response",
-    });
-    return;
-  }
+  if (responseText === null || isError) return;
   if (COOLDOWN_REGEX.test(responseText)) {
     log.debug("Ignoring cooldown response for stats", { command });
     return;
@@ -234,7 +223,6 @@ export function recordCommandResult(
     category: eventCategory(command),
     delta,
     balanceAfter: balanceChange?.balanceAfter ?? playerInfo.potatoes,
-    succeeded: isError ? 0 : 1,
     responseText: responseText.slice(0, 500),
   });
   if (!TRACKED_COMMANDS.has(command)) return;
@@ -246,8 +234,8 @@ export function recordCommandResult(
     steal: command === Actions.STEAL ? delta : 0,
     stealAttempts: command === Actions.STEAL ? 1 : 0,
     stealSuccesses: command === Actions.STEAL && delta > 0 ? 1 : 0,
-    rankups: command === Actions.RANKUP && !isError ? 1 : 0,
-    prestiges: command === Actions.PRESTIGE && !isError ? 1 : 0,
+    rankups: command === Actions.RANKUP ? 1 : 0,
+    prestiges: command === Actions.PRESTIGE ? 1 : 0,
     quizReward: 0,
     quizAttempts: 0,
     quizSuccesses: 0,
@@ -262,19 +250,6 @@ export function recordCommandResult(
 
   addToStats(sessionTotals, increment);
   log.debug("Command stats recorded", { command, isError, delta, increment });
-}
-
-export function recordCommandFailure(command: string, error: unknown): void {
-  if (command === Actions.STATUS) return;
-  recordEvent({
-    executedAt: new Date().toISOString(),
-    command,
-    category: eventCategory(command),
-    delta: 0,
-    balanceAfter: playerInfo.potatoes,
-    succeeded: 0,
-    responseText: error instanceof Error ? error.message : String(error),
-  });
 }
 
 function formatNumber(n: number): string {

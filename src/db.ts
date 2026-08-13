@@ -33,7 +33,6 @@ export interface Event {
   category: string;
   delta: number;
   balanceAfter: number;
-  succeeded: number;
   responseText: string;
 }
 
@@ -43,7 +42,6 @@ export interface NewEvent {
   category: string;
   delta: number;
   balanceAfter: number;
-  succeeded: number;
   responseText: string;
 }
 
@@ -186,7 +184,6 @@ export function initDb(): void {
       category         TEXT    NOT NULL,
       delta            INTEGER NOT NULL,
       balanceAfter     INTEGER NOT NULL,
-      succeeded        INTEGER NOT NULL DEFAULT 1,
       responseText     TEXT    NOT NULL DEFAULT ''
     );
     CREATE INDEX IF NOT EXISTS idx_events_executedAt
@@ -207,10 +204,19 @@ export function initDb(): void {
     .prepare("PRAGMA table_info(events)")
     .all()
     .map((row) => (row as { name: string }).name);
-  if (!eventColumns.includes("succeeded"))
-    db.exec(
-      "ALTER TABLE events ADD COLUMN succeeded INTEGER NOT NULL DEFAULT 1",
-    );
+  if (eventColumns.includes("succeeded")) {
+    db.exec(`
+      UPDATE events
+      SET category = 'quiz_failure'
+      WHERE succeeded = 0
+        AND category = 'quiz'
+        AND responseText = 'Quiz attempt failed';
+      DELETE FROM events
+      WHERE succeeded = 0 AND category != 'quiz_failure';
+    `);
+    db.exec("ALTER TABLE events DROP COLUMN succeeded");
+    log.info("Removed command failures from event history");
+  }
   db.exec(`
     UPDATE events SET category = 'spending' WHERE category = 'shop_cdr';
     DELETE FROM events WHERE command = 'status';
@@ -318,11 +324,11 @@ export function initDb(): void {
       FROM daily WHERE date >= ?
     `),
     insertEvent: db.prepare(`
-      INSERT INTO events (executedAt, command, category, delta, balanceAfter, succeeded, responseText)
-      VALUES (@executedAt, @command, @category, @delta, @balanceAfter, @succeeded, @responseText)
+      INSERT INTO events (executedAt, command, category, delta, balanceAfter, responseText)
+      VALUES (@executedAt, @command, @category, @delta, @balanceAfter, @responseText)
     `),
     getEvents: db.prepare(`
-      SELECT id, executedAt, command, category, delta, balanceAfter, succeeded, responseText
+      SELECT id, executedAt, command, category, delta, balanceAfter, responseText
       FROM events
       WHERE executedAt >= ? AND executedAt <= ?
       ORDER BY executedAt ASC, id ASC
@@ -398,7 +404,6 @@ export function recordEvent(event: NewEvent): void {
     category: event.category,
     delta: event.delta,
     balanceAfter: event.balanceAfter,
-    succeeded: event.succeeded === 1,
   });
 }
 
