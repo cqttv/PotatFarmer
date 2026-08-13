@@ -31,7 +31,10 @@ test("plan guards reserve a buffer for cooldown and shop purchases", () => {
   const player = { potatoes: 129, rank: Rank.BackyardGarden, prestige: 0 };
   assert.equal(shouldRun(Actions.CDR, player), true);
   assert.equal(shouldRun(Actions.SHOP_CDR, player), false);
-  assert.equal(shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 144 }), false);
+  assert.equal(
+    shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 144 }),
+    false,
+  );
   assert.equal(shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 145 }), true);
   assert.equal(shouldRun(Actions.FARM, { ...player, potatoes: 0 }), true);
 });
@@ -42,10 +45,7 @@ test("shop cdr reserves enough potatoes for the purchase and its follow-up", () 
     shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 369 }),
     false,
   );
-  assert.equal(
-    shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 370 }),
-    true,
-  );
+  assert.equal(shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 370 }), true);
 });
 
 test("progression readiness uses authoritative exact cost boundaries", () => {
