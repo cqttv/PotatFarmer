@@ -1,11 +1,13 @@
 import { createServer, type OutgoingHttpHeaders, type Server } from "node:http";
 
+import { WEB_PORT } from "../config.js";
+import { cache, getEvent, getEvents } from "../db/index.js";
+import { log } from "../logger.js";
+import { playerInfo } from "../stats/player.js";
+import { sessionStart, sessionTotals } from "../stats/recording.js";
+
 import { DASHBOARD_HTML } from "./dashboard.js";
-import { cache, getEvent, getEvents } from "./db/index.js";
-import { playerInfo } from "./stats/player.js";
-import { sessionStart, sessionTotals } from "./stats/recording.js";
-import { WEB_PORT } from "./config.js";
-import { log } from "./logger.js";
+import { parseEventRange } from "./request.js";
 
 const JSON_HEADERS: OutgoingHttpHeaders = {
   "Content-Type": "application/json",
@@ -57,14 +59,8 @@ export function startServer(): Server {
     }
 
     if (req.method === "GET" && url === "/events") {
-      const now = Date.now();
-      const fromParam = reqUrl.searchParams.get("from");
-      const toParam = reqUrl.searchParams.get("to");
-      const fromMs = fromParam ? Date.parse(fromParam) : now - 86400000;
-      const toMs = toParam ? Date.parse(toParam) : now;
-      const from = new Date(Number.isNaN(fromMs) ? now - 86400000 : fromMs);
-      const to = new Date(Number.isNaN(toMs) ? now : toMs);
-      const events = getEvents(from.toISOString(), to.toISOString());
+      const { from, to } = parseEventRange(reqUrl.searchParams);
+      const events = getEvents(from, to);
       const body = JSON.stringify({ events });
       res.writeHead(200, JSON_HEADERS);
       res.end(body);

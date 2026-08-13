@@ -1,6 +1,8 @@
 import { log } from "../logger.js";
 import { Rank, type RankValue } from "../plans.js";
 
+import { parseRankResponse } from "./rank-parser.js";
+
 export interface PlayerInfo {
   username: string;
   potatoes: number;
@@ -14,16 +16,6 @@ export interface PlayerInfo {
   totalPlayers: number;
   lastCommand: string | null;
 }
-
-const RANK_BY_NAME = new Map<string, RankValue>([
-  ["Bankrupt", Rank.Bankrupt],
-  ["Backyard Garden", Rank.BackyardGarden],
-  ["Greenhouse", Rank.Greenhouse],
-  ["Acre Farm", Rank.AcreFarm],
-  ["10 Acre Farm", Rank.TenAcreFarm],
-  ["Potato Plantation", Rank.PotatoPlantation],
-  ["Industrial Potato Facility", Rank.Industrial],
-]);
 
 export const playerInfo: PlayerInfo = {
   username: "",
@@ -40,33 +32,7 @@ export const playerInfo: PlayerInfo = {
 };
 
 export function updateFromRank(text: string): void {
-  const username = text.match(/(\w+)/)?.[1];
-  const potatoes = text.match(/has (-?[\d,]+) potatoes/)?.[1];
-  const prestige = text.match(/Prestige: (\d+)/)?.[1];
-  const harvests = text.match(/Harvests: ([\d,]+)/)?.[1];
-  const steals = text.match(/Stole ([\d,]+) times?/)?.[1];
-  const stolenFrom = text.match(/Stolen from ([\d,]+) times?/)?.[1];
-  const farmSize = text.match(/Farm: ([^●]+)/)?.[1];
-  const rankMatch = text.match(/Ranked #(\d+)\/(\d+)/);
-
-  if (username) playerInfo.username = username;
-  if (potatoes) playerInfo.potatoes = parseInt(potatoes.replace(/,/g, ""), 10);
-  if (prestige) playerInfo.prestige = parseInt(prestige, 10);
-  if (harvests) playerInfo.harvests = parseInt(harvests.replace(/,/g, ""), 10);
-  if (steals) playerInfo.steals = parseInt(steals.replace(/,/g, ""), 10);
-  if (stolenFrom) {
-    playerInfo.stolenFrom = parseInt(stolenFrom.replace(/,/g, ""), 10);
-  }
-  if (farmSize) {
-    const trimmed = farmSize.trim();
-    playerInfo.farmSize = trimmed;
-    const rank = RANK_BY_NAME.get(trimmed);
-    if (rank !== undefined) playerInfo.rank = rank;
-  }
-  if (rankMatch?.[1] && rankMatch[2]) {
-    playerInfo.leaderboardRank = parseInt(rankMatch[1], 10);
-    playerInfo.totalPlayers = parseInt(rankMatch[2], 10);
-  }
+  Object.assign(playerInfo, parseRankResponse(text));
   log.debug("Player data updated from rank response", {
     username: playerInfo.username,
     potatoes: playerInfo.potatoes,

@@ -1,4 +1,4 @@
-import { fetchRank, sendCommand } from "../api.js";
+import { fetchRank, sendCommand } from "../api/client.js";
 import { BOT_PREFIX } from "../config.js";
 import { formatLogText, log } from "../logger.js";
 import { Actions, shouldRun, type Command } from "../plans.js";

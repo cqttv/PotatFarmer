@@ -1,5 +1,5 @@
-import { AI_API_KEY, API_PROVIDER, type AIProvider } from "./config.js";
-import { formatLogText, log } from "./logger.js";
+import { AI_API_KEY, API_PROVIDER, type AIProvider } from "../config.js";
+import { formatLogText, log } from "../logger.js";
 
 interface ChatCompletionResponse {
   choices?: { message?: { content?: string | null } }[];

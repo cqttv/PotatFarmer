@@ -1,21 +1,12 @@
-import { BEARER_TOKEN, API_URL, BOT_PREFIX } from "./config.js";
-import { Actions } from "./plans.js";
-import { formatLogText, log } from "./logger.js";
+import { BEARER_TOKEN, API_URL, BOT_PREFIX } from "../config.js";
+import { formatLogText, log } from "../logger.js";
+import { Actions } from "../plans.js";
+
+import { parseApiResponse } from "./response.js";
 
 export interface CommandResult {
   text: string | null;
   isError: boolean;
-}
-
-interface ApiResponseData {
-  text?: string;
-  error?: string;
-}
-
-interface ApiResponse {
-  data: ApiResponseData[] | ApiResponseData;
-  errors?: { message: string }[];
-  statusCode: number;
 }
 
 export class CommandError extends Error {
@@ -50,7 +41,7 @@ export async function sendCommand(command: string): Promise<CommandResult> {
     throw err;
   }
 
-  const data = (await response.json()) as ApiResponse;
+  const data = parseApiResponse(await response.json());
   if (!response.ok || data.statusCode !== 200) {
     const error = new CommandError(
       data.errors?.map((e) => e.message).join("; ") ??

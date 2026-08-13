@@ -3,19 +3,20 @@ import {
   fetchRank,
   sendCommand,
   type CommandResult,
-} from "./api.js";
-import { answerQuizQuestion } from "./ai.js";
-import { BOT_PREFIX, COMMAND_DELAY } from "./config.js";
+} from "../api/client.js";
+import { BOT_PREFIX, COMMAND_DELAY } from "../config.js";
 import {
   deleteQuizAnswer,
   getQuizAnswer,
   recordEvent,
   saveQuizAnswer,
-} from "./db/index.js";
-import { Actions } from "./plans.js";
-import { formatLogText, log } from "./logger.js";
-import { playerInfo, setLastCommand, updateFromRank } from "./stats/player.js";
-import { recordQuizStats } from "./stats/recording.js";
+} from "../db/index.js";
+import { formatLogText, log } from "../logger.js";
+import { Actions } from "../plans.js";
+import { playerInfo, setLastCommand, updateFromRank } from "../stats/player.js";
+import { recordQuizStats } from "../stats/recording.js";
+
+import { answerQuizQuestion } from "./solver.js";
 
 const QUIZ_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
