@@ -63,3 +63,40 @@ test("cooldown reduction appends newly available farm actions once", () => {
     Actions.STEAL,
   ]);
 });
+
+test("failed purchases and cooldown resets do not unlock follow-up actions", () => {
+  const purchases = new CommandQueue([Actions.SHOP_CDR, Actions.SHOP_QUIZ]);
+  assert.equal(purchases.takeNext(), Actions.SHOP_CDR);
+  scheduleFollowUps(purchases, Actions.SHOP_CDR, {
+    succeeded: false,
+    rankupReady: false,
+    prestigeReady: false,
+  });
+  assert.equal(purchases.takeNext(), Actions.SHOP_QUIZ);
+  scheduleFollowUps(purchases, Actions.SHOP_QUIZ, {
+    succeeded: false,
+    rankupReady: false,
+    prestigeReady: false,
+  });
+  assert.deepEqual(purchases.snapshot(), [Actions.SHOP_CDR, Actions.SHOP_QUIZ]);
+
+  const reset = new CommandQueue([Actions.CDR]);
+  assert.equal(reset.takeNext(), Actions.CDR);
+  scheduleFollowUps(reset, Actions.CDR, {
+    succeeded: false,
+    rankupReady: false,
+    prestigeReady: false,
+  });
+  assert.deepEqual(reset.snapshot(), [Actions.CDR]);
+});
+
+test("processed commands cannot be re-enqueued within the same status cycle", () => {
+  const queue = new CommandQueue([Actions.FARM]);
+  assert.equal(queue.processedCount, 0);
+  assert.equal(queue.takeNext(), Actions.FARM);
+  queue.enqueueNext(Actions.FARM);
+  queue.enqueueLast(Actions.FARM);
+  assert.equal(queue.processedCount, 1);
+  assert.deepEqual(queue.snapshot(), [Actions.FARM]);
+  assert.equal(queue.takeNext(), null);
+});

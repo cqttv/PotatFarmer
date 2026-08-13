@@ -26,4 +26,13 @@ test("parseApiResponse rejects malformed payloads", () => {
   assert.throws(() => parseApiResponse(null));
   assert.throws(() => parseApiResponse({ statusCode: "200", data: {} }));
   assert.throws(() => parseApiResponse({ statusCode: 200, data: [null] }));
+  assert.throws(() =>
+    parseApiResponse({ statusCode: 200, data: { text: 123 } }),
+  );
+  assert.throws(() =>
+    parseApiResponse({ statusCode: 200, data: {}, errors: [{ message: 123 }] }),
+  );
+  assert.throws(() =>
+    parseApiResponse({ statusCode: 200, data: {}, errors: "bad" }),
+  );
 });

@@ -32,3 +32,32 @@ test("parseEventRange falls back when a date is invalid", () => {
     },
   );
 });
+
+test("parseEventRange falls back independently for blank and invalid bounds", () => {
+  assert.deepEqual(
+    parseEventRange(
+      new URLSearchParams({
+        from: " ",
+        to: "not-a-date",
+      }),
+      NOW,
+    ),
+    {
+      from: "2026-08-11T12:00:00.000Z",
+      to: "2026-08-12T12:00:00.000Z",
+    },
+  );
+  assert.deepEqual(
+    parseEventRange(
+      new URLSearchParams({
+        from: "2026-08-01T00:00:00Z",
+        to: "not-a-date",
+      }),
+      NOW,
+    ),
+    {
+      from: "2026-08-01T00:00:00.000Z",
+      to: "2026-08-12T12:00:00.000Z",
+    },
+  );
+});
