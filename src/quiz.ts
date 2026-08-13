@@ -9,17 +9,13 @@ import { BOT_PREFIX, COMMAND_DELAY } from "./config.js";
 import {
   deleteQuizAnswer,
   getQuizAnswer,
-  recordBalanceChange,
+  recordEvent,
   saveQuizAnswer,
-} from "./db.js";
+} from "./db/index.js";
 import { Actions } from "./plans.js";
 import { formatLogText, log } from "./logger.js";
-import {
-  playerInfo,
-  recordQuizStats,
-  setLastCommand,
-  updateFromRank,
-} from "./stats.js";
+import { playerInfo, setLastCommand, updateFromRank } from "./stats/player.js";
+import { recordQuizStats } from "./stats/recording.js";
 
 const QUIZ_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
@@ -43,6 +39,14 @@ function normalizeQuestion(question: string): string {
 }
 
 function failQuiz(): QuizResult {
+  recordEvent({
+    executedAt: new Date().toISOString(),
+    command: Actions.QUIZ,
+    category: "quiz_failure",
+    delta: 0,
+    balanceAfter: playerInfo.potatoes,
+    responseText: "Quiz attempt failed",
+  });
   recordQuizStats({ quizFailures: 1 });
   return "failed";
 }
@@ -83,16 +87,14 @@ async function recordSuccess(
   const rank = await fetchRank();
   if (rank) updateFromRank(rank);
   const reward = Math.max(0, playerInfo.potatoes - balanceBefore);
-  if (reward > 0) {
-    recordBalanceChange({
-      executedAt: new Date().toISOString(),
-      command: `${Actions.ANSWER} ${answer}`,
-      category: "quiz",
-      delta: reward,
-      balanceAfter: playerInfo.potatoes,
-      responseText: `Correct quiz answer: ${answer}`,
-    });
-  }
+  recordEvent({
+    executedAt: new Date().toISOString(),
+    command: `${Actions.ANSWER} ${answer}`,
+    category: "quiz",
+    delta: reward,
+    balanceAfter: playerInfo.potatoes,
+    responseText: `Correct quiz answer: ${answer}`,
+  });
   saveQuizAnswer(questionKey, answer);
   recordQuizStats({ quizSuccesses: 1, quizReward: reward });
   log.info("Quiz completed successfully", {

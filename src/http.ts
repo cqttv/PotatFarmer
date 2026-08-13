@@ -1,8 +1,9 @@
 import { createServer, type OutgoingHttpHeaders, type Server } from "node:http";
 
 import { DASHBOARD_HTML } from "./dashboard.js";
-import { cache, getBalanceEvents } from "./db.js";
-import { playerInfo, sessionTotals, sessionStart } from "./stats.js";
+import { cache, getEvent, getEvents } from "./db/index.js";
+import { playerInfo } from "./stats/player.js";
+import { sessionStart, sessionTotals } from "./stats/recording.js";
 import { WEB_PORT } from "./config.js";
 import { log } from "./logger.js";
 
@@ -55,7 +56,7 @@ export function startServer(): Server {
       return;
     }
 
-    if (req.method === "GET" && url === "/balance-events") {
+    if (req.method === "GET" && url === "/events") {
       const now = Date.now();
       const fromParam = reqUrl.searchParams.get("from");
       const toParam = reqUrl.searchParams.get("to");
@@ -63,7 +64,7 @@ export function startServer(): Server {
       const toMs = toParam ? Date.parse(toParam) : now;
       const from = new Date(Number.isNaN(fromMs) ? now - 86400000 : fromMs);
       const to = new Date(Number.isNaN(toMs) ? now : toMs);
-      const events = getBalanceEvents(from.toISOString(), to.toISOString());
+      const events = getEvents(from.toISOString(), to.toISOString());
       const body = JSON.stringify({ events });
       res.writeHead(200, JSON_HEADERS);
       res.end(body);
@@ -73,6 +74,24 @@ export function startServer(): Server {
         status: 200,
         durationMs: Date.now() - startedAt,
         eventCount: events.length,
+      });
+      return;
+    }
+
+    const eventMatch = url.match(/^\/events\/(\d+)$/);
+    if (req.method === "GET" && eventMatch?.[1]) {
+      const event = getEvent(Number(eventMatch[1]));
+      const status = event ? 200 : 404;
+      const body = JSON.stringify(
+        event ? { event } : { error: "event not found" },
+      );
+      res.writeHead(status, JSON_HEADERS);
+      res.end(body);
+      log.debug("HTTP request completed", {
+        method: req.method,
+        path: url,
+        status,
+        durationMs: Date.now() - startedAt,
       });
       return;
     }
