@@ -26,13 +26,16 @@ export interface StatsRow {
   quizApiCalls: number;
 }
 
-export interface Event {
+export interface EventSummary {
   id: number;
   executedAt: string;
   command: string;
   category: string;
   delta: number;
   balanceAfter: number;
+}
+
+export interface Event extends EventSummary {
   responseText: string;
 }
 
@@ -53,6 +56,7 @@ interface Queries {
   getWeek: StatementSync;
   insertEvent: StatementSync;
   getEvents: StatementSync;
+  getEvent: StatementSync;
   getQuizAnswer: StatementSync;
   upsertQuizAnswer: StatementSync;
   deleteQuizAnswer: StatementSync;
@@ -328,10 +332,15 @@ export function initDb(): void {
       VALUES (@executedAt, @command, @category, @delta, @balanceAfter, @responseText)
     `),
     getEvents: db.prepare(`
-      SELECT id, executedAt, command, category, delta, balanceAfter, responseText
+      SELECT id, executedAt, command, category, delta, balanceAfter
       FROM events
       WHERE executedAt >= ? AND executedAt <= ?
       ORDER BY executedAt ASC, id ASC
+    `),
+    getEvent: db.prepare(`
+      SELECT id, executedAt, command, category, delta, balanceAfter, responseText
+      FROM events
+      WHERE id = ?
     `),
     getQuizAnswer: db.prepare(
       "SELECT answer FROM quiz_answers WHERE question = ?",
@@ -407,8 +416,12 @@ export function recordEvent(event: NewEvent): void {
   });
 }
 
-export function getEvents(from: string, to: string): Event[] {
-  return queries.getEvents.all(from, to) as unknown as Event[];
+export function getEvents(from: string, to: string): EventSummary[] {
+  return queries.getEvents.all(from, to) as unknown as EventSummary[];
+}
+
+export function getEvent(id: number): Event | null {
+  return (queries.getEvent.get(id) as unknown as Event | undefined) ?? null;
 }
 
 export function getQuizAnswer(question: string): string | null {

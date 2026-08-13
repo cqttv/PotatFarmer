@@ -60,6 +60,13 @@ body.modal-open { overflow:hidden }
 #tip { position:fixed; z-index:30; pointer-events:none; min-width:205px; max-width:300px; background:#050607; border:1px solid #617078; color:var(--text); padding:8px 10px; box-shadow:0 8px 30px #000; font-size:12px; line-height:1.5 }
 #tip .t { color:var(--yellow); font-weight:bold; margin-bottom:3px }
 #tip .k { color:var(--muted) }
+#eventModal { position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; padding:18px; background:rgba(0,0,0,.78) }
+#eventModal[hidden] { display:none }
+.event-card { width:min(620px,100%); max-height:85vh; overflow:auto; border:1px solid #617078; background:#0d1113; box-shadow:0 20px 80px #000 }
+.event-head { display:flex; align-items:center; justify-content:space-between; padding:10px 13px; border-bottom:1px solid var(--line); color:var(--yellow); font-weight:bold }
+.event-close { border:1px solid #354047; background:#111618; color:var(--text); padding:3px 8px; cursor:pointer }
+.event-body { padding:12px 14px }
+.event-response { margin-top:10px; padding:10px; border:1px solid var(--line); background:#080a0b; color:#b9c3c7; white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.5 'Courier New',monospace }
 @media (max-width:1250px) { .kpis { grid-template-columns:repeat(3,1fr) } .kpi:nth-child(3) { border-right:0 } .kpi:nth-child(-n+3) { border-bottom:1px solid var(--line) } }
 @media (max-width:1050px) { #page { grid-template-columns:1fr } #box { order:-1 } }
 @media (max-width:760px) { body { padding:8px } .grid { grid-template-columns:1fr; padding:8px } .plot-wide { grid-column:auto } .kpis { grid-template-columns:repeat(2,1fr) } .kpi { border-bottom:1px solid var(--line) !important } .kpi:nth-child(even) { border-right:0 } .plot canvas { height:260px } .hint { width:100%; margin-left:0 } .plot.expanded { inset:4px } }
@@ -104,6 +111,7 @@ body.modal-open { overflow:hidden }
 </div>
 <div id="foot"></div>
 <div id="tip" hidden></div>
+<div id="eventModal" role="dialog" aria-modal="true" aria-labelledby="eventTitle" hidden><article class="event-card"><header class="event-head"><span id="eventTitle">Event details</span><button id="eventClose" class="event-close" type="button" aria-label="Close event details">Close</button></header><div id="eventBody" class="event-body"></div></article></div>
 <script>
 const _esc = document.createElement('span')
 function esc(s) { _esc.textContent = String(s || ''); return _esc.innerHTML }
@@ -238,6 +246,23 @@ function renderTip(point, canvas) {
   if (left + tr.width > window.innerWidth - 8) left = rect.left + point.px - tr.width - 14
   if (top < 8) top = rect.top + point.py + 14
   tip.style.left = Math.max(8,left) + 'px'; tip.style.top = Math.min(window.innerHeight - tr.height - 8,Math.max(8,top)) + 'px'
+}
+function closeEvent() { document.getElementById('eventModal').hidden=true }
+async function openEvent(point) {
+  const modal=document.getElementById('eventModal'),body=document.getElementById('eventBody')
+  modal.hidden=false;body.innerHTML='<span class="dim">Loading event details&hellip;</span>'
+  try {
+    const response=await fetch('/events/'+encodeURIComponent(point.id))
+    if(!response.ok)throw new Error('event request failed ('+response.status+')')
+    const detail=(await response.json()).event
+    body.innerHTML=
+      row('Time:',esc(dateTimeFmt.format(new Date(detail.executedAt))))+
+      row('Type:',esc(categoryLabel(detail.category)))+
+      row('Command:',esc(detail.command),'yellow')+
+      row('Balance change:',signed(detail.delta),cls(detail.delta))+
+      row('Balance after:',fmt(detail.balanceAfter))+
+      '<div class="sec">Stored response</div><pre class="event-response">'+esc(detail.responseText||'No response text stored')+'</pre>'
+  } catch(e) { body.innerHTML='<span class="red">'+esc(String(e))+'</span>' }
 }
 function nearestPoint(points, target) {
   if (!target || !points.length) return null
@@ -402,10 +427,12 @@ chartDefs.forEach(def=>{
   canvas.addEventListener('pointercancel',()=>{drag=null;const selection=document.getElementById('selection');if(selection)selection.remove()})
   canvas.addEventListener('mouseleave',()=>{if(!drag){hover=null;queueChartRedraw(def.id)}})
   canvas.addEventListener('wheel',e=>{e.preventDefault();const p=position(e),pw=Math.max(1,p.width-chartPad.l-chartPad.r),ratio=Math.max(0,Math.min(1,(p.x-chartPad.l)/pw)),start=viewFrom.getTime(),end=viewTo.getTime(),anchor=start+(end-start)*ratio,factor=e.deltaY>0?1.35:.72;clampView(anchor-(anchor-start)*factor,anchor+(end-anchor)*factor)},{passive:false})
-  canvas.addEventListener('click',e=>{if(suppressClick){suppressClick=false;return}const p=position(e),point=nearestPoint(renderedPoints[def.id]||[],p);pinned=point?{chartId:def.id,eventId:point.id}:null;hover=point?{id:def.id,x:p.x,y:p.y}:null;queueChartRedraw(def.id)})
+  canvas.addEventListener('click',e=>{if(suppressClick){suppressClick=false;return}const p=position(e),point=nearestPoint(renderedPoints[def.id]||[],p);pinned=point?{chartId:def.id,eventId:point.id}:null;hover=point?{id:def.id,x:p.x,y:p.y}:null;queueChartRedraw(def.id);if(point)openEvent(point)})
   canvas.addEventListener('dblclick',resetZoom)
 })
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&expandedId)toggleExpand(expandedId)})
+document.getElementById('eventClose').addEventListener('click',closeEvent)
+document.getElementById('eventModal').addEventListener('click',e=>{if(e.target.id==='eventModal')closeEvent()})
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElementById('eventModal').hidden)closeEvent();else if(e.key==='Escape'&&expandedId)toggleExpand(expandedId)})
 window.addEventListener('resize',queueRedraw)
 updateRangeInputs(24);document.querySelector('[data-range="24"]').classList.add('active')
 refreshCharts(true);refresh();setInterval(refresh,1000);setInterval(()=>{if(!analyticsLoading)refreshCharts(false,false)},15000)

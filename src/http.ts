@@ -1,7 +1,7 @@
 import { createServer, type OutgoingHttpHeaders, type Server } from "node:http";
 
 import { DASHBOARD_HTML } from "./dashboard.js";
-import { cache, getEvents } from "./db.js";
+import { cache, getEvent, getEvents } from "./db.js";
 import { playerInfo, sessionTotals, sessionStart } from "./stats.js";
 import { WEB_PORT } from "./config.js";
 import { log } from "./logger.js";
@@ -73,6 +73,24 @@ export function startServer(): Server {
         status: 200,
         durationMs: Date.now() - startedAt,
         eventCount: events.length,
+      });
+      return;
+    }
+
+    const eventMatch = url.match(/^\/events\/(\d+)$/);
+    if (req.method === "GET" && eventMatch?.[1]) {
+      const event = getEvent(Number(eventMatch[1]));
+      const status = event ? 200 : 404;
+      const body = JSON.stringify(
+        event ? { event } : { error: "event not found" },
+      );
+      res.writeHead(status, JSON_HEADERS);
+      res.end(body);
+      log.debug("HTTP request completed", {
+        method: req.method,
+        path: url,
+        status,
+        durationMs: Date.now() - startedAt,
       });
       return;
     }
