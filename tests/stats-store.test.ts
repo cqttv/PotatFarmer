@@ -105,5 +105,24 @@ test("recording updates every cache horizon and persists daily aggregates", () =
       quizApiCalls: 2,
     },
   );
+
+  const reloadedCache = newCache();
+  createStatsStore(
+    database,
+    reloadedCache,
+    () => new Date("2026-08-12T12:00:00.000Z"),
+  ).loadCache();
+  assert.deepEqual(
+    {
+      totals: { ...reloadedCache.totals },
+      today: { ...reloadedCache.today },
+      week: { ...reloadedCache.week },
+    },
+    {
+      totals: { ...cache.totals },
+      today: { ...cache.today },
+      week: { ...cache.week },
+    },
+  );
   database.close();
 });
