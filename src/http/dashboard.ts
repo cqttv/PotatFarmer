@@ -75,7 +75,7 @@ body.modal-open { overflow:hidden }
 <body>
 <div id="page">
   <main id="charts">
-    <div class="hdr"><span>BALANCE ANALYTICS</span><small id="windowLabel">Selected window</small></div>
+    <div class="hdr"><span>ANALYTICS</span><small id="windowLabel">Selected window</small></div>
     <div class="toolbar">
       <label>From <input id="from" type="datetime-local"></label>
       <label>To <input id="to" type="datetime-local"></label>
@@ -105,7 +105,7 @@ body.modal-open { overflow:hidden }
     <div id="chartLoading" role="status" aria-live="polite" hidden><span class="spinner" aria-hidden="true"></span><span>Loading analytics&hellip;</span></div>
   </main>
   <aside id="box">
-    <div class="hdr"><span>POTAT FARMER</span><small>live</small></div>
+    <div class="hdr"><span>STATS</span><small>live</small></div>
     <div id="root">Loading&hellip;</div>
   </aside>
 </div>
