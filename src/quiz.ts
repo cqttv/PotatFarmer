@@ -11,15 +11,11 @@ import {
   getQuizAnswer,
   recordEvent,
   saveQuizAnswer,
-} from "./db.js";
+} from "./db/index.js";
 import { Actions } from "./plans.js";
 import { formatLogText, log } from "./logger.js";
-import {
-  playerInfo,
-  recordQuizStats,
-  setLastCommand,
-  updateFromRank,
-} from "./stats.js";
+import { playerInfo, setLastCommand, updateFromRank } from "./stats/player.js";
+import { recordQuizStats } from "./stats/recording.js";
 
 const QUIZ_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 5;

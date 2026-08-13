@@ -1,8 +1,9 @@
 import { createServer, type OutgoingHttpHeaders, type Server } from "node:http";
 
 import { DASHBOARD_HTML } from "./dashboard.js";
-import { cache, getEvent, getEvents } from "./db.js";
-import { playerInfo, sessionTotals, sessionStart } from "./stats.js";
+import { cache, getEvent, getEvents } from "./db/index.js";
+import { playerInfo } from "./stats/player.js";
+import { sessionStart, sessionTotals } from "./stats/recording.js";
 import { WEB_PORT } from "./config.js";
 import { log } from "./logger.js";
 
