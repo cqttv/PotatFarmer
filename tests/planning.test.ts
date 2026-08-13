@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildQueueFromStatus, parseStatus } from "../src/app/status.js";
-import { Actions, Rank, shouldRun } from "../src/plans.js";
+import {
+  Actions,
+  progressionReadiness,
+  Rank,
+  shouldRun,
+} from "../src/plans.js";
 
 test("status parsing ignores unknown fields and builds the expected queue", () => {
   const status = parseStatus(
@@ -26,8 +31,40 @@ test("plan guards reserve a buffer for cooldown and shop purchases", () => {
   const player = { potatoes: 129, rank: Rank.BackyardGarden, prestige: 0 };
   assert.equal(shouldRun(Actions.CDR, player), true);
   assert.equal(shouldRun(Actions.SHOP_CDR, player), false);
-  assert.equal(shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 130 }), true);
+  assert.equal(shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 144 }), false);
+  assert.equal(shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 145 }), true);
   assert.equal(shouldRun(Actions.FARM, { ...player, potatoes: 0 }), true);
+});
+
+test("shop cdr reserves enough potatoes for the purchase and its follow-up", () => {
+  const player = { rank: Rank.Industrial, prestige: 0 };
+  assert.equal(
+    shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 369 }),
+    false,
+  );
+  assert.equal(
+    shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 370 }),
+    true,
+  );
+});
+
+test("progression readiness uses authoritative exact cost boundaries", () => {
+  assert.deepEqual(
+    progressionReadiness({
+      potatoes: 1_000,
+      rank: Rank.BackyardGarden,
+      prestige: 0,
+    }),
+    { rankupReady: true, prestigeReady: false },
+  );
+  assert.deepEqual(
+    progressionReadiness({
+      potatoes: 140_000,
+      rank: Rank.Industrial,
+      prestige: 2,
+    }),
+    { rankupReady: false, prestigeReady: true },
+  );
 });
 
 test("status planning farms and steals independently when either is ready", () => {

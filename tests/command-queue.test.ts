@@ -47,6 +47,19 @@ test("rank and prestige follow-ups keep priority over action cascades", () => {
     Actions.PRESTIGE,
     Actions.QUIZ,
   ]);
+
+  const statusQueue = new CommandQueue([]);
+  scheduleFollowUps(statusQueue, Actions.STATUS, {
+    succeeded: true,
+    rankupReady: true,
+    prestigeReady: false,
+  });
+  statusQueue.enqueueLast(Actions.FARM, Actions.STEAL);
+  assert.deepEqual(statusQueue.snapshot(), [
+    Actions.RANKUP,
+    Actions.FARM,
+    Actions.STEAL,
+  ]);
 });
 
 test("cooldown reduction appends newly available farm actions once", () => {

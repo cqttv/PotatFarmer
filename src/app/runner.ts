@@ -6,9 +6,10 @@ import {
   WEB_DASHBOARD_ENABLED,
 } from "../config.js";
 import { log } from "../logger.js";
-import { Actions, type Command } from "../plans.js";
+import { Actions, progressionReadiness, type Command } from "../plans.js";
 import { runQuizPlan } from "../quiz/runner.js";
 import { displayStats } from "../stats/console.js";
+import { playerInfo } from "../stats/player.js";
 
 import { CommandQueue, scheduleFollowUps } from "./command-queue.js";
 import {
@@ -29,7 +30,9 @@ async function runStatusCycle(): Promise<void> {
   }
 
   const status = parseStatus(statusResult.text);
-  const queue = new CommandQueue(buildQueueFromStatus(status));
+  const queue = new CommandQueue([]);
+  scheduleFollowUps(queue, Actions.STATUS, statusResult);
+  queue.enqueueLast(...buildQueueFromStatus(status));
   log.info("Status queue built", { status, queue: queue.snapshot() });
 
   for (let command: Command | null; (command = queue.takeNext()) !== null; ) {
@@ -38,12 +41,12 @@ async function runStatusCycle(): Promise<void> {
     let result: ExecutedCommand;
     if (command === Actions.QUIZ) {
       const quizResult = await runQuizPlan();
+      const readiness = progressionReadiness(playerInfo);
       log.info("Quiz plan finished", { result: quizResult });
       result = {
         succeeded: quizResult === "completed",
         text: null,
-        rankupReady: false,
-        prestigeReady: false,
+        ...readiness,
       };
     } else {
       result = await executeCommand(command);
