@@ -107,6 +107,16 @@ function buildStatsRows(stats: StatsRow): string[] {
       ),
     );
   }
+  if (stats.gambleAttempts > 0) {
+    rows.push(
+      commandStatRow(
+        "Gamble:",
+        stats.gambleWins,
+        stats.gambleAttempts,
+        stats.gamble,
+      ),
+    );
+  }
   if (stats.rankups > 0) {
     rows.push(tableRow("Rank Ups:", formatNumber(stats.rankups), ANSI.cyan));
   }
@@ -139,7 +149,7 @@ function buildStatsRows(stats: StatsRow): string[] {
   if (rows.length === 0) {
     rows.push(tableRow("", "–", ANSI.dim));
   } else {
-    const total = stats.farm + stats.steal + stats.quizReward;
+    const total = stats.farm + stats.steal + stats.gamble + stats.quizReward;
     if (total !== 0) {
       rows.push(tableRow("Total:", formatDelta(total), deltaColor(total)));
     }

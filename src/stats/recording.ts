@@ -21,6 +21,7 @@ export const sessionStart = Date.now();
 const TRACKED_COMMANDS: ReadonlySet<string> = new Set([
   Actions.FARM,
   Actions.STEAL,
+  Actions.GAMBLE,
   Actions.RANKUP,
   Actions.PRESTIGE,
 ]);
@@ -88,6 +89,9 @@ export function recordCommandResult(
     steal: command === Actions.STEAL ? delta : 0,
     stealAttempts: command === Actions.STEAL ? 1 : 0,
     stealSuccesses: command === Actions.STEAL && delta > 0 ? 1 : 0,
+    gamble: command === Actions.GAMBLE ? delta : 0,
+    gambleAttempts: command === Actions.GAMBLE ? 1 : 0,
+    gambleWins: command === Actions.GAMBLE && delta > 0 ? 1 : 0,
     rankups: command === Actions.RANKUP ? 1 : 0,
     prestiges: command === Actions.PRESTIGE ? 1 : 0,
   };

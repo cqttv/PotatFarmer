@@ -5,6 +5,9 @@ export interface StatsRow {
   steal: number;
   stealAttempts: number;
   stealSuccesses: number;
+  gamble: number;
+  gambleAttempts: number;
+  gambleWins: number;
   rankups: number;
   prestiges: number;
   quizReward: number;

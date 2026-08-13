@@ -92,17 +92,18 @@ body.modal-open { overflow:hidden }
       <button id="apply" type="button">Apply</button>
       <span class="divider"></span>
       <button id="resetZoom" type="button" disabled>Reset zoom</button>
-      <label>Event <select id="categoryFilter"><option value="all">All types</option><option value="harvest">Harvest</option><option value="steal">Steal</option><option value="spending">Spending</option><option value="quiz">Quiz reward</option><option value="quiz_failure">Quiz failure</option><option value="rankup">Rank up</option><option value="prestige">Prestige</option><option value="other">Other</option></select></label>
+      <label>Event <select id="categoryFilter"><option value="all">All types</option><option value="harvest">Harvest</option><option value="steal">Steal</option><option value="gamble">Gamble</option><option value="spending">Spending</option><option value="quiz">Quiz reward</option><option value="quiz_failure">Quiz failure</option><option value="rankup">Rank up</option><option value="prestige">Prestige</option><option value="other">Other</option></select></label>
       <label>Impact <select id="impactFilter"><option value="all">Any impact</option><option value="gain">Gains</option><option value="loss">Losses</option><option value="neutral">No change</option></select></label>
       <span class="hint">Drag zoom · wheel zoom · Shift+drag pan</span>
     </div>
     <section class="kpis" id="kpis" aria-label="Selected window metrics"></section>
     <div class="grid">
-      <section class="plot plot-wide" data-chart="overview"><div class="plot-head"><div><span class="plot-title">Balance &amp; Activity</span><span class="plot-meta" id="overviewMeta"></span><span class="legend"><span><i style="background:#4ade80"></i>Harvest</span><span><i style="background:#38bdf8"></i>Steal</span><span><i style="background:#fb7185"></i>Spend</span><span><i style="background:#c084fc"></i>Quiz</span><span><i style="background:#ef4444"></i>Quiz fail</span><span><i style="background:#fb923c"></i>Rank</span><span><i style="background:#ffda44"></i>Prestige</span></span></div><div class="plot-tools"><button class="chart-action" data-expand="overview" type="button" aria-label="Expand Balance and Activity">Expand</button></div></div><canvas id="overview"></canvas></section>
+      <section class="plot plot-wide" data-chart="overview"><div class="plot-head"><div><span class="plot-title">Balance &amp; Activity</span><span class="plot-meta" id="overviewMeta"></span><span class="legend"><span><i style="background:#4ade80"></i>Harvest</span><span><i style="background:#38bdf8"></i>Steal</span><span><i style="background:#a78bfa"></i>Gamble</span><span><i style="background:#fb7185"></i>Spend</span><span><i style="background:#c084fc"></i>Quiz</span><span><i style="background:#ef4444"></i>Quiz fail</span><span><i style="background:#fb923c"></i>Rank</span><span><i style="background:#ffda44"></i>Prestige</span></span></div><div class="plot-tools"><button class="chart-action" data-expand="overview" type="button" aria-label="Expand Balance and Activity">Expand</button></div></div><canvas id="overview"></canvas></section>
       <section class="plot" data-chart="steal"><div class="plot-head"><div><span class="plot-title">Steal P&amp;L</span><span class="plot-meta" id="stealMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="steal" type="button" aria-label="Expand Steal P&amp;L">Expand</button></div></div><canvas id="steal"></canvas></section>
       <section class="plot" data-chart="harvest"><div class="plot-head"><div><span class="plot-title">Harvest Yield</span><span class="plot-meta" id="harvestMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="harvest" type="button" aria-label="Expand Harvest Yield">Expand</button></div></div><canvas id="harvest"></canvas></section>
       <section class="plot" data-chart="spending"><div class="plot-head"><div><span class="plot-title">Spending</span><span class="plot-meta" id="spendingMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="spending" type="button" aria-label="Expand Spending">Expand</button></div></div><canvas id="spending"></canvas></section>
       <section class="plot" data-chart="quiz"><div class="plot-head"><div><span class="plot-title">Quiz Outcomes</span><span class="plot-meta" id="quizMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="quiz" type="button" aria-label="Expand Quiz Outcomes">Expand</button></div></div><canvas id="quiz"></canvas></section>
+      <section class="plot" data-chart="gamble"><div class="plot-head"><div><span class="plot-title">Gamble P&amp;L</span><span class="plot-meta" id="gambleMeta"></span></div><div class="plot-tools"><button class="chart-action" data-expand="gamble" type="button" aria-label="Expand Gamble P&amp;L">Expand</button></div></div><canvas id="gamble"></canvas></section>
     </div>
     <div id="chartLoading" role="status" aria-live="polite" hidden><span class="spinner" aria-hidden="true"></span><span>Loading analytics&hellip;</span></div>
   </main>
@@ -127,6 +128,7 @@ function statRows(s) {
   let out = ''
   if (s.farmAttempts > 0) out += row('Farm:', fmt(s.farmSuccesses) + ' / ' + fmt(s.farmAttempts) + ' (' + pct(s.farmSuccesses, s.farmAttempts) + ')&nbsp; <span class="' + cls(s.farm) + '">' + signed(s.farm) + '</span>')
   if (s.stealAttempts > 0) out += row('Steal:', fmt(s.stealSuccesses) + ' / ' + fmt(s.stealAttempts) + ' (' + pct(s.stealSuccesses, s.stealAttempts) + ')&nbsp; <span class="' + cls(s.steal) + '">' + signed(s.steal) + '</span>')
+  if (s.gambleAttempts > 0) out += row('Gamble:', fmt(s.gambleWins) + ' / ' + fmt(s.gambleAttempts) + ' (' + pct(s.gambleWins, s.gambleAttempts) + ')&nbsp; <span class="' + cls(s.gamble) + '">' + signed(s.gamble) + '</span>')
   if (s.rankups > 0) out += row('Rank Ups:', fmt(s.rankups), 'cyan')
   if (s.prestiges > 0) out += row('Prestiges:', fmt(s.prestiges), 'cyan')
   if (s.quizAttempts > 0) {
@@ -134,7 +136,7 @@ function statRows(s) {
     out += row('Quiz Outcomes:', fmt(s.quizSuccesses) + ' correct, ' + fmt(s.quizFailures) + ' failed')
   }
   if (s.quizAnswerAttempts > 0) out += row('Quiz Answers:', fmt(s.quizAnswerAttempts) + ' (' + fmt(s.quizIncorrectAnswers) + ' incorrect, ' + fmt(s.quizCacheHits) + ' cached, ' + fmt(s.quizApiCalls) + ' API)')
-  const total = s.farm + s.steal + s.quizReward
+  const total = s.farm + s.steal + s.gamble + s.quizReward
   if (total !== 0) out += row('Total:', signed(total), cls(total))
   return out || row('', '&mdash;', 'dim')
 }
@@ -154,6 +156,7 @@ const chartDefs = [
   { id:'harvest', filter:e => e.category === 'harvest', mode:'delta', style:'bar', color:'#2dd4d1' },
   { id:'spending', filter:e => e.category === 'spending', mode:'delta', style:'bar', color:'#2dd4d1' },
   { id:'quiz', filter:e => e.category === 'quiz' || e.category === 'quiz_failure', mode:'delta', style:'bar', color:'#2dd4d1' },
+  { id:'gamble', filter:e => e.category === 'gamble', mode:'delta', style:'bar', color:'#2dd4d1' },
 ]
 const chartPad = { l:62, r:18, t:20, b:38 }
 const MIN_WINDOW_MS = 10000
@@ -230,10 +233,10 @@ function setLoading(value) {
   document.getElementById('charts').setAttribute('aria-busy',String(value))
 }
 function categoryLabel(category) {
-  return { harvest:'Harvest', steal:'Steal', spending:'Spending', quiz:'Quiz reward', quiz_failure:'Quiz failure', rankup:'Rank up', prestige:'Prestige', other:'Other' }[category] || category
+  return { harvest:'Harvest', steal:'Steal', gamble:'Gamble', spending:'Spending', quiz:'Quiz reward', quiz_failure:'Quiz failure', rankup:'Rank up', prestige:'Prestige', other:'Other' }[category] || category
 }
 function eventColor(category) {
-  return { harvest:'#4ade80', steal:'#38bdf8', spending:'#fb7185', quiz:'#c084fc', quiz_failure:'#ef4444', rankup:'#fb923c', prestige:'#ffda44' }[category] || '#94a3b8'
+  return { harvest:'#4ade80', steal:'#38bdf8', gamble:'#a78bfa', spending:'#fb7185', quiz:'#c084fc', quiz_failure:'#ef4444', rankup:'#fb923c', prestige:'#ffda44' }[category] || '#94a3b8'
 }
 function renderTip(point, canvas) {
   const tip = document.getElementById('tip'), changeClass = cls(point.delta)

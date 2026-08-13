@@ -6,6 +6,7 @@ export const Actions = {
   SHOP_FERTILIZER: "shop fertilizer",
   EAT: "eat",
   STEAL: "steal",
+  GAMBLE: "gamble",
   RANKUP: "rankup",
   PRESTIGE: "prestige",
   RANK: "rank",

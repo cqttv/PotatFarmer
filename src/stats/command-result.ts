@@ -25,6 +25,7 @@ export function parseBalanceChange(text: string): BalanceChange | null {
 export function eventCategory(command: string): string {
   if (command === Actions.STEAL) return "steal";
   if (command === Actions.FARM) return "harvest";
+  if (command === Actions.GAMBLE) return "gamble";
   if (command === Actions.RANKUP) return "rankup";
   if (command === Actions.PRESTIGE) return "prestige";
   if (

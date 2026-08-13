@@ -6,6 +6,7 @@ import { createSchema } from "./001-create-schema.js";
 import { removeUnsuccessfulEvents } from "./002-remove-unsuccessful-events.js";
 import { normalizeEvents } from "./003-normalize-events.js";
 import { addQuizStats } from "./004-add-quiz-stats.js";
+import { addGambleStats } from "./005-add-gamble-stats.js";
 import type { Migration } from "./types.js";
 
 const MIGRATIONS: readonly Migration[] = [
@@ -13,6 +14,7 @@ const MIGRATIONS: readonly Migration[] = [
   removeUnsuccessfulEvents,
   normalizeEvents,
   addQuizStats,
+  addGambleStats,
 ];
 
 export function runMigrations(db: DatabaseSync): void {
