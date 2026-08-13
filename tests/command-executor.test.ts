@@ -3,17 +3,30 @@ import test from "node:test";
 
 import { executeCommand } from "../src/app/command-executor.js";
 import { closeDb, getEvents, initDb } from "../src/db/index.js";
+import { log } from "../src/logger.js";
 import { Actions, Rank } from "../src/plans.js";
 import { playerInfo } from "../src/stats/player.js";
 
 const originalFetch = globalThis.fetch;
 
 test("executeCommand records a rejected steal that changed the balance", async (t) => {
+  const originalLogError = log.error;
+  const originalLogInfo = log.info;
+  const errors: string[] = [];
+  const infos: string[] = [];
   initDb(":memory:");
   t.after(() => {
     globalThis.fetch = originalFetch;
+    log.error = originalLogError;
+    log.info = originalLogInfo;
     closeDb();
   });
+  log.error = (message): void => {
+    errors.push(message);
+  };
+  log.info = (message): void => {
+    infos.push(message);
+  };
   Object.assign(playerInfo, {
     potatoes: 100,
     rank: Rank.BackyardGarden,
@@ -41,6 +54,8 @@ test("executeCommand records a rejected steal that changed the balance", async (
   });
   assert.equal(playerInfo.potatoes, 88);
   assert.equal(playerInfo.lastCommand, "#steal");
+  assert.deepEqual(errors, []);
+  assert.deepEqual(infos, ["Rejected command applied a game-state change"]);
   assert.deepEqual(
     getEvents("2026-01-01T00:00:00.000Z", "2027-01-01T00:00:00.000Z").map(
       ({ command, delta, balanceAfter }) => ({

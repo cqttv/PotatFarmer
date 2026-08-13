@@ -1,7 +1,12 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
-import { LOG_FILE, LOG_LEVEL, type LogLevel } from "./config.js";
+import {
+  FILE_LOGGING_ENABLED,
+  LOG_FILE,
+  LOG_LEVEL,
+  type LogLevel,
+} from "./config.js";
 
 type LogFields = Record<string, unknown>;
 
@@ -12,23 +17,25 @@ const LEVEL_VALUE: Record<LogLevel, number> = {
   error: 40,
 };
 
-let fileLoggingAvailable = true;
+let fileLoggingAvailable = FILE_LOGGING_ENABLED;
 
-try {
-  // LOG_FILE is an intentionally user-configurable destination.
-  // eslint-disable-next-line security/detect-non-literal-fs-filename
-  mkdirSync(dirname(LOG_FILE), { recursive: true });
-} catch (error) {
-  fileLoggingAvailable = false;
-  process.stderr.write(
-    `${JSON.stringify({
-      timestamp: new Date().toISOString(),
-      level: "error",
-      message: "Unable to initialize log file",
-      logFile: LOG_FILE,
-      ...errorFields(error),
-    })}\n`,
-  );
+if (fileLoggingAvailable) {
+  try {
+    // LOG_FILE is an intentionally user-configurable destination.
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    mkdirSync(dirname(LOG_FILE), { recursive: true });
+  } catch (error) {
+    fileLoggingAvailable = false;
+    process.stderr.write(
+      `${JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: "error",
+        message: "Unable to initialize log file",
+        logFile: LOG_FILE,
+        ...errorFields(error),
+      })}\n`,
+    );
+  }
 }
 
 function errorFields(error: unknown): LogFields {
@@ -73,10 +80,10 @@ function write(level: LogLevel, message: string, fields: LogFields = {}): void {
 }
 
 export interface Logger {
-  debug(message: string, fields?: LogFields): void;
-  info(message: string, fields?: LogFields): void;
-  warn(message: string, fields?: LogFields): void;
-  error(message: string, error?: unknown, fields?: LogFields): void;
+  debug: (message: string, fields?: LogFields) => void;
+  info: (message: string, fields?: LogFields) => void;
+  warn: (message: string, fields?: LogFields) => void;
+  error: (message: string, error?: unknown, fields?: LogFields) => void;
 }
 
 export const log: Logger = {

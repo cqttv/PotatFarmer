@@ -5,7 +5,7 @@
     "prettier:fix": "npx prettier --write .",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
-    "test": "BEARER_TOKEN=test node --import tsx --test tests/*.test.ts",
+    "test": "BEARER_TOKEN=test FILE_LOGGING_ENABLED=false node --import tsx --test tests/*.test.ts",
     "build": "tsdown",
     "type-check": "tsc --noEmit",
     "start": "tsdown && node --env-file=.env dist/main.mjs",

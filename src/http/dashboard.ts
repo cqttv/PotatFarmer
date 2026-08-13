@@ -82,6 +82,8 @@ body.modal-open { overflow:hidden }
       <button data-range="1" type="button">1h</button>
       <button data-range="4" type="button">4h</button>
       <button data-range="24" type="button">24h</button>
+      <button data-range="48" type="button">2d</button>
+      <button data-range="96" type="button">4d</button>
       <button data-range="168" type="button">7d</button>
       <button data-range="720" type="button">30d</button>
       <button data-range="2160" type="button">90d</button>

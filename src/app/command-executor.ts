@@ -86,11 +86,19 @@ export async function executeCommand(
   } catch (error) {
     const responseText =
       error instanceof CommandError ? error.responseText : null;
+    let stateChanged = false;
     if (responseText !== null && command !== Actions.STATUS) {
-      const stateChanged = recordCommandResult(command, responseText, true);
+      stateChanged = recordCommandResult(command, responseText, true);
       if (stateChanged) setLastCommand(`${BOT_PREFIX}${command}`);
     }
-    log.error("Command execution failed", error, { command });
+    if (stateChanged) {
+      log.info("Rejected command applied a game-state change", {
+        command,
+        response: formatLogText(responseText),
+      });
+    } else {
+      log.error("Command execution failed", error, { command });
+    }
     return {
       succeeded: false,
       text: responseText,
