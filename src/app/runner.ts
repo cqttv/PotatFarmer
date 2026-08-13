@@ -6,10 +6,12 @@ import {
   WEB_DASHBOARD_ENABLED,
 } from "../config.js";
 import { log } from "../logger.js";
-import { Actions, type Command } from "../plans.js";
-import { runQuizPlan } from "../quiz.js";
+import { Actions, progressionReadiness, type Command } from "../plans.js";
+import { runQuizPlan } from "../quiz/runner.js";
 import { displayStats } from "../stats/console.js";
+import { playerInfo } from "../stats/player.js";
 
+import { CommandQueue, scheduleFollowUps } from "./command-queue.js";
 import {
   executeCommand,
   refreshRank,
@@ -28,50 +30,29 @@ async function runStatusCycle(): Promise<void> {
   }
 
   const status = parseStatus(statusResult.text);
-  const queue = buildQueueFromStatus(status);
-  const queued = new Set<Command>(queue);
-  let index = 0;
-  log.info("Status queue built", { status, queue });
+  const queue = new CommandQueue([]);
+  scheduleFollowUps(queue, Actions.STATUS, statusResult);
+  queue.enqueueLast(...buildQueueFromStatus(status));
+  log.info("Status queue built", { status, queue: queue.snapshot() });
 
-  const enqueue = (command: Command, next = false): void => {
-    if (queued.has(command)) return;
-    queued.add(command);
-    if (next) queue.splice(index + 1, 0, command);
-    else queue.push(command);
-    log.debug("Command added to active queue", { command, next, queue });
-  };
-
-  for (; index < queue.length; index += 1) {
-    const command = queue.at(index);
-    if (!command) continue;
+  for (let command: Command | null; (command = queue.takeNext()) !== null; ) {
     await sleep(COMMAND_DELAY);
 
     let result: ExecutedCommand;
     if (command === Actions.QUIZ) {
       const quizResult = await runQuizPlan();
+      const readiness = progressionReadiness(playerInfo);
       log.info("Quiz plan finished", { result: quizResult });
       result = {
         succeeded: quizResult === "completed",
         text: null,
-        rankupReady: false,
-        prestigeReady: false,
+        ...readiness,
       };
     } else {
       result = await executeCommand(command);
     }
 
-    if (result.prestigeReady) enqueue(Actions.PRESTIGE, true);
-    else if (result.rankupReady) enqueue(Actions.RANKUP, true);
-    if (result.succeeded && command === Actions.SHOP_CDR) {
-      enqueue(Actions.CDR, true);
-    }
-    if (result.succeeded && command === Actions.CDR) {
-      enqueue(Actions.FARM);
-      enqueue(Actions.STEAL);
-    }
-    if (result.succeeded && command === Actions.SHOP_QUIZ) {
-      enqueue(Actions.QUIZ, true);
-    }
+    scheduleFollowUps(queue, command, result);
 
     if (result.succeeded && command === Actions.PRESTIGE) {
       log.info("Status cycle ended after prestige", {
@@ -82,7 +63,7 @@ async function runStatusCycle(): Promise<void> {
   }
   log.debug("Status cycle completed", {
     durationMs: Date.now() - cycleStartedAt,
-    commandsProcessed: queue.length,
+    commandsProcessed: queue.processedCount,
   });
 }
 

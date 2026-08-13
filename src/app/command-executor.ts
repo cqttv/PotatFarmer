@@ -1,7 +1,12 @@
-import { fetchRank, sendCommand } from "../api.js";
+import { CommandError, fetchRank, sendCommand } from "../api/client.js";
 import { BOT_PREFIX } from "../config.js";
 import { formatLogText, log } from "../logger.js";
-import { Actions, shouldRun, type Command } from "../plans.js";
+import {
+  Actions,
+  progressionReadiness,
+  shouldRun,
+  type Command,
+} from "../plans.js";
 import { playerInfo, setLastCommand, updateFromRank } from "../stats/player.js";
 import { recordCommandResult } from "../stats/recording.js";
 
@@ -54,18 +59,21 @@ export async function executeCommand(
     if (result.text !== null && command !== Actions.STATUS) {
       setLastCommand(`${BOT_PREFIX}${command}`);
     }
-    recordCommandResult(command, result.text, result.isError);
     if (
       (command === Actions.RANKUP || command === Actions.PRESTIGE) &&
       !result.isError
     ) {
       await refreshRank();
     }
+    recordCommandResult(command, result.text, result.isError);
+    const stateReadiness = progressionReadiness(playerInfo);
     const executed: ExecutedCommand = {
       succeeded: !result.isError && result.text !== null,
       text: result.text,
-      rankupReady: hasReadyMarker(result.text, "rankup"),
-      prestigeReady: hasReadyMarker(result.text, "prestige"),
+      rankupReady:
+        stateReadiness.rankupReady || hasReadyMarker(result.text, "rankup"),
+      prestigeReady:
+        stateReadiness.prestigeReady || hasReadyMarker(result.text, "prestige"),
     };
     log.info("Command executed", {
       command,
@@ -76,10 +84,24 @@ export async function executeCommand(
     });
     return executed;
   } catch (error) {
-    log.error("Command execution failed", error, { command });
+    const responseText =
+      error instanceof CommandError ? error.responseText : null;
+    let stateChanged = false;
+    if (responseText !== null && command !== Actions.STATUS) {
+      stateChanged = recordCommandResult(command, responseText, true);
+      if (stateChanged) setLastCommand(`${BOT_PREFIX}${command}`);
+    }
+    if (stateChanged) {
+      log.info("Rejected command applied a game-state change", {
+        command,
+        response: formatLogText(responseText),
+      });
+    } else {
+      log.error("Command execution failed", error, { command });
+    }
     return {
       succeeded: false,
-      text: null,
+      text: responseText,
       rankupReady: false,
       prestigeReady: false,
     };

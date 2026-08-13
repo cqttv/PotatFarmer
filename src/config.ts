@@ -28,6 +28,8 @@ export type LogLevel = "debug" | "info" | "warn" | "error";
 export const LOG_LEVEL = parseLogLevel(process.env["LOG_LEVEL"]);
 export const LOG_FILE =
   process.env["LOG_FILE"]?.trim() ?? "logs/potatfarmer.log";
+export const FILE_LOGGING_ENABLED =
+  process.env["FILE_LOGGING_ENABLED"] !== "false";
 
 function parseLogLevel(raw: string | undefined): LogLevel {
   const level = raw?.trim().toLowerCase() ?? "debug";

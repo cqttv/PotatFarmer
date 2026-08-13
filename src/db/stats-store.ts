@@ -48,13 +48,13 @@ export interface StatsStore {
   record: (stats: StatsRow) => void;
 }
 
-function todayString(): string {
-  return new Date().toISOString().slice(0, 10);
+function todayString(now: Date): string {
+  return now.toISOString().slice(0, 10);
 }
 
-function weekStartString(): string {
-  const date = new Date();
-  date.setDate(date.getDate() - 6);
+function weekStartString(now: Date): string {
+  const date = new Date(now);
+  date.setUTCDate(date.getUTCDate() - 6);
   return date.toISOString().slice(0, 10);
 }
 
@@ -104,20 +104,24 @@ function readStats(
 export function createStatsStore(
   db: DatabaseSync,
   cache: StatsCache,
+  now: () => Date = () => new Date(),
 ): StatsStore {
   const queries = prepareQueries(db);
   let lastRecordDate = "";
 
   return {
     loadCache(): void {
-      const today = todayString();
+      const currentDate = now();
+      const today = todayString(currentDate);
       cache.totals = readStats(queries.getTotals);
       cache.today = readStats(queries.getDaily, today);
-      cache.week = readStats(queries.getWeek, weekStartString());
+      cache.week = readStats(queries.getWeek, weekStartString(currentDate));
       lastRecordDate = today;
     },
     record(stats): void {
-      const date = todayString();
+      const currentDate = now();
+      const date = todayString(currentDate);
+      const rolledOver = date !== lastRecordDate;
       queries.updateTotals.run(
         stats as unknown as Record<string, SQLInputValue>,
       );
@@ -125,14 +129,15 @@ export function createStatsStore(
         ...stats,
         date,
       } as unknown as Record<string, SQLInputValue>);
-      if (date !== lastRecordDate) {
+
+      if (rolledOver) {
         lastRecordDate = date;
         cache.today = { ...ZERO_STATS };
-        cache.week = readStats(queries.getWeek, weekStartString());
+        cache.week = readStats(queries.getWeek, weekStartString(currentDate));
       }
       addToStats(cache.totals, stats);
       addToStats(cache.today, stats);
-      addToStats(cache.week, stats);
+      if (!rolledOver) addToStats(cache.week, stats);
     },
   };
 }

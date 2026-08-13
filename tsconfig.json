@@ -8,7 +8,7 @@
     "verbatimModuleSyntax": true,
     "types": ["node"],
 
-    "rootDir": "src",
+    "rootDir": ".",
     "outDir": "dist",
     "sourceMap": true,
     "resolveJsonModule": true,
@@ -39,6 +39,6 @@
     "noPropertyAccessFromIndexSignature": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "tests/**/*"],
   "exclude": ["node_modules"]
 }

@@ -3,8 +3,9 @@
   "scripts": {
     "prettier": "npx prettier --check .",
     "prettier:fix": "npx prettier --write .",
-    "lint": "eslint ./src --max-warnings=0",
-    "lint:fix": "eslint ./src --fix",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
+    "test": "BEARER_TOKEN=test FILE_LOGGING_ENABLED=false node --import tsx --test tests/*.test.ts",
     "build": "tsdown",
     "type-check": "tsc --noEmit",
     "start": "tsdown && node --env-file=.env dist/main.mjs",

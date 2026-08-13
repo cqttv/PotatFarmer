@@ -3,7 +3,7 @@ import type { Server } from "node:http";
 import { run, runDisplay } from "./app/runner.js";
 import { CONSOLE_STATS_ENABLED, WEB_DASHBOARD_ENABLED } from "./config.js";
 import { closeDb, initDb } from "./db/index.js";
-import { startServer } from "./http.js";
+import { startServer } from "./http/server.js";
 import { log } from "./logger.js";
 
 initDb();

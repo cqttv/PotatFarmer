@@ -75,13 +75,15 @@ body.modal-open { overflow:hidden }
 <body>
 <div id="page">
   <main id="charts">
-    <div class="hdr"><span>BALANCE ANALYTICS</span><small id="windowLabel">Selected window</small></div>
+    <div class="hdr"><span>ANALYTICS</span><small id="windowLabel">Selected window</small></div>
     <div class="toolbar">
       <label>From <input id="from" type="datetime-local"></label>
       <label>To <input id="to" type="datetime-local"></label>
       <button data-range="1" type="button">1h</button>
       <button data-range="4" type="button">4h</button>
       <button data-range="24" type="button">24h</button>
+      <button data-range="48" type="button">2d</button>
+      <button data-range="96" type="button">4d</button>
       <button data-range="168" type="button">7d</button>
       <button data-range="720" type="button">30d</button>
       <button data-range="2160" type="button">90d</button>
@@ -105,7 +107,7 @@ body.modal-open { overflow:hidden }
     <div id="chartLoading" role="status" aria-live="polite" hidden><span class="spinner" aria-hidden="true"></span><span>Loading analytics&hellip;</span></div>
   </main>
   <aside id="box">
-    <div class="hdr"><span>POTAT FARMER</span><small>live</small></div>
+    <div class="hdr"><span>STATS</span><small>live</small></div>
     <div id="root">Loading&hellip;</div>
   </aside>
 </div>

@@ -29,6 +29,7 @@ export default [
         __dirname: "readonly",
         Buffer: "readonly",
         URL: "readonly",
+        URLSearchParams: "readonly",
       },
     },
     plugins: {
@@ -78,6 +79,13 @@ export default [
           "newlines-between": "always",
         },
       ],
+    },
+  },
+  {
+    files: ["tests/**/*.ts"],
+    rules: {
+      // node:test registers tests through intentionally unawaited calls.
+      "@typescript-eslint/no-floating-promises": "off",
     },
   },
 ];
