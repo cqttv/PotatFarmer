@@ -32,7 +32,7 @@ test("balance parsing handles gains, losses, commas, and negative balances", () 
 test("delta parsing supports both known response formats", () => {
   assert.equal(parseDelta(Actions.FARM, "Result [+42]"), 42);
   assert.equal(parseDelta(Actions.STEAL, "Result - 1,234 🥔"), -1234);
-  assert.equal(parseDelta(Actions.EAT, "Result [-100]"), 0);
+  assert.equal(parseDelta(Actions.EAT, "Result [-5]"), -5);
 });
 
 test("event categories cover farming, progression, and spending commands", () => {
@@ -96,7 +96,78 @@ test("command recording updates balance, events, and every aggregate horizon", (
   }
 });
 
-test("command recording ignores API errors, cooldowns, and recycled harvests", (t) => {
+test("command recording preserves applied steal losses from API errors", (t) => {
+  initDb(":memory:");
+  t.after(() => {
+    closeDb();
+  });
+  Object.assign(sessionTotals, ZERO_STATS);
+  playerInfo.potatoes = 100;
+
+  recordCommandResult(
+    Actions.STEAL,
+    "❌ farmer [-12 ⇒ 88] ⏰ 90 minutes",
+    true,
+  );
+
+  assert.equal(playerInfo.potatoes, 88);
+  assert.deepEqual(
+    getEvents("2026-01-01T00:00:00.000Z", "2027-01-01T00:00:00.000Z").map(
+      ({ command, category, delta, balanceAfter }) => ({
+        command,
+        category,
+        delta,
+        balanceAfter,
+      }),
+    ),
+    [
+      {
+        command: Actions.STEAL,
+        category: "steal",
+        delta: -12,
+        balanceAfter: 88,
+      },
+    ],
+  );
+  for (const stats of [cache.totals, cache.today, cache.week, sessionTotals]) {
+    assert.equal(stats.steal, -12);
+    assert.equal(stats.stealAttempts, 1);
+    assert.equal(stats.stealSuccesses, 0);
+  }
+});
+
+test("command recording applies relative eat costs to balance and spending", (t) => {
+  initDb(":memory:");
+  t.after(() => {
+    closeDb();
+  });
+  Object.assign(sessionTotals, ZERO_STATS);
+  playerInfo.potatoes = 100;
+
+  recordCommandResult(Actions.EAT, "Meal prepared [-5]", false);
+
+  assert.equal(playerInfo.potatoes, 95);
+  assert.deepEqual(
+    getEvents("2026-01-01T00:00:00.000Z", "2027-01-01T00:00:00.000Z").map(
+      ({ command, category, delta, balanceAfter }) => ({
+        command,
+        category,
+        delta,
+        balanceAfter,
+      }),
+    ),
+    [
+      {
+        command: Actions.EAT,
+        category: "spending",
+        delta: -5,
+        balanceAfter: 95,
+      },
+    ],
+  );
+});
+
+test("command recording ignores unapplied API errors, cooldowns, and recycled harvests", (t) => {
   initDb(":memory:");
   t.after(() => {
     closeDb();
@@ -106,7 +177,7 @@ test("command recording ignores API errors, cooldowns, and recycled harvests", (
 
   recordCommandResult(Actions.FARM, "✋⏰ ⇒ 15 minutes", false);
   recordCommandResult(Actions.FARM, "Crops ruined [+0 ⇒ 100] ♻⏰", false);
-  recordCommandResult(Actions.STEAL, "Stole [+50 ⇒ 150]", true);
+  recordCommandResult(Actions.STEAL, "Invalid target", true);
   recordCommandResult(Actions.STATUS, "Potato: ✅", false);
 
   assert.deepEqual(

@@ -50,30 +50,35 @@ export function recordCommandResult(
   command: string,
   responseText: string | null,
   isError: boolean,
-): void {
-  if (command === Actions.STATUS || responseText === null || isError) return;
+): boolean {
+  if (command === Actions.STATUS || responseText === null) return false;
   if (COOLDOWN_REGEX.test(responseText)) {
     log.debug("Ignoring cooldown response for stats", { command });
-    return;
+    return false;
   }
   if (command === Actions.FARM && /♻⏰/.test(responseText)) {
     log.debug("Ignoring recycled farm response for stats", { command });
-    return;
+    return false;
   }
 
   const balanceChange = parseBalanceChange(responseText);
-  if (balanceChange) playerInfo.potatoes = balanceChange.balanceAfter;
+  // PotatBotat reports failed steals as API errors after applying their loss.
+  // A full balance transition proves that the command changed game state.
+  if (isError && balanceChange === null) return false;
+
   const delta = balanceChange?.delta ?? parseDelta(command, responseText);
+  if (balanceChange) playerInfo.potatoes = balanceChange.balanceAfter;
+  else if (command === Actions.EAT) playerInfo.potatoes += delta;
 
   recordEvent({
     executedAt: new Date().toISOString(),
     command,
     category: eventCategory(command),
     delta,
-    balanceAfter: balanceChange?.balanceAfter ?? playerInfo.potatoes,
+    balanceAfter: playerInfo.potatoes,
     responseText: responseText.slice(0, 500),
   });
-  if (!TRACKED_COMMANDS.has(command)) return;
+  if (!TRACKED_COMMANDS.has(command)) return true;
 
   const increment: StatsRow = {
     ...ZERO_STATS,
@@ -89,4 +94,5 @@ export function recordCommandResult(
   record(increment);
   addToStats(sessionTotals, increment);
   log.debug("Command stats recorded", { command, isError, delta, increment });
+  return true;
 }

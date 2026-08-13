@@ -1,4 +1,4 @@
-import { fetchRank, sendCommand } from "../api/client.js";
+import { CommandError, fetchRank, sendCommand } from "../api/client.js";
 import { BOT_PREFIX } from "../config.js";
 import { formatLogText, log } from "../logger.js";
 import { Actions, shouldRun, type Command } from "../plans.js";
@@ -76,10 +76,16 @@ export async function executeCommand(
     });
     return executed;
   } catch (error) {
+    const responseText =
+      error instanceof CommandError ? error.responseText : null;
+    if (responseText !== null && command !== Actions.STATUS) {
+      const stateChanged = recordCommandResult(command, responseText, true);
+      if (stateChanged) setLastCommand(`${BOT_PREFIX}${command}`);
+    }
     log.error("Command execution failed", error, { command });
     return {
       succeeded: false,
-      text: null,
+      text: responseText,
       rankupReady: false,
       prestigeReady: false,
     };

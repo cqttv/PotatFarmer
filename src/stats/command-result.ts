@@ -6,6 +6,11 @@ export interface BalanceChange {
 }
 
 const BALANCE_REGEX = /\[([+-])([\d,]+)\s*⇒\s*(-?[\d,]+)\]/;
+const RELATIVE_BALANCE_COMMANDS: ReadonlySet<string> = new Set([
+  Actions.FARM,
+  Actions.STEAL,
+  Actions.EAT,
+]);
 
 export function parseBalanceChange(text: string): BalanceChange | null {
   const match = text.match(BALANCE_REGEX);
@@ -33,7 +38,7 @@ export function eventCategory(command: string): string {
 }
 
 export function parseDelta(command: string, responseText: string): number {
-  if (command !== Actions.FARM && command !== Actions.STEAL) return 0;
+  if (!RELATIVE_BALANCE_COMMANDS.has(command)) return 0;
 
   const bracketMatch = responseText.match(/\[([+-])([\d,]+)/);
   if (bracketMatch?.[1] && bracketMatch[2]) {

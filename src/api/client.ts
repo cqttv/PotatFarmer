@@ -11,11 +11,17 @@ export interface CommandResult {
 
 export class CommandError extends Error {
   readonly status: number;
+  readonly responseText: string | null;
 
-  constructor(message: string, status: number) {
+  constructor(
+    message: string,
+    status: number,
+    responseText: string | null = null,
+  ) {
     super(message);
     this.name = "CommandError";
     this.status = status;
+    this.responseText = responseText;
   }
 }
 
@@ -43,10 +49,12 @@ export async function sendCommand(command: string): Promise<CommandResult> {
 
   const data = parseApiResponse(await response.json());
   if (!response.ok || data.statusCode !== 200) {
+    const responseText =
+      data.errors?.map((error) => error.message).join("; ") ?? null;
     const error = new CommandError(
-      data.errors?.map((e) => e.message).join("; ") ??
-        `HTTP ${response.status}`,
+      responseText ?? `HTTP ${response.status}`,
       data.statusCode || response.status,
+      responseText,
     );
     log.warn("Command was rejected", {
       command,

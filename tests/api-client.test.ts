@@ -91,6 +91,7 @@ test("sendCommand rejects HTTP and API failures with the API status and messages
     (error: unknown) =>
       error instanceof CommandError &&
       error.status === 429 &&
-      error.message === "daily limit; try later",
+      error.message === "daily limit; try later" &&
+      error.responseText === "daily limit; try later",
   );
 });
