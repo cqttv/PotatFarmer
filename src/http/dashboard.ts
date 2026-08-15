@@ -176,6 +176,7 @@ let suppressClick = false
 let eventsController = null
 let requestSequence = 0
 let analyticsLoading = false
+let eventFocusSequence = 0
 const renderedPoints = {}
 function localInputValue(date) { return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0,16) }
 function updateRangeInputs(hours) {
@@ -235,6 +236,17 @@ function categoryLabel(category) {
 function eventColor(category) {
   return { harvest:'#4ade80', steal:'#38bdf8', spending:'#fb7185', quiz:'#c084fc', quiz_failure:'#ef4444', rankup:'#fb923c', prestige:'#ffda44' }[category] || '#94a3b8'
 }
+function linkedEventId() {
+  const value=new URLSearchParams(window.location.search).get('event')
+  const id=value&&/^[1-9][0-9]*$/.test(value)?Number(value):null
+  return id!==null&&Number.isSafeInteger(id)?id:null
+}
+function updateEventUrl(id,mode) {
+  const url=new URL(window.location.href)
+  if(id===null)url.searchParams.delete('event');else url.searchParams.set('event',String(id))
+  if(url.href===window.location.href)return
+  if(mode==='push')history.pushState(null,'',url);else history.replaceState(null,'',url)
+}
 function renderTip(point, canvas) {
   const tip = document.getElementById('tip'), changeClass = cls(point.delta)
   tip.innerHTML = '<div class="t">' + esc(dateTimeFmt.format(new Date(point.executedAt))) + '</div>' +
@@ -249,22 +261,64 @@ function renderTip(point, canvas) {
   if (top < 8) top = rect.top + point.py + 14
   tip.style.left = Math.max(8,left) + 'px'; tip.style.top = Math.min(window.innerHeight - tr.height - 8,Math.max(8,top)) + 'px'
 }
-function closeEvent() { document.getElementById('eventModal').hidden=true }
-async function openEvent(point) {
+function renderEventDetail(detail) {
+  document.getElementById('eventTitle').textContent='Event #'+detail.id
+  document.getElementById('eventBody').innerHTML=
+    row('Time:',esc(dateTimeFmt.format(new Date(detail.executedAt))))+
+    row('Type:',esc(categoryLabel(detail.category)))+
+    row('Command:',esc(detail.command),'yellow')+
+    row('Balance change:',signed(detail.delta),cls(detail.delta))+
+    row('Balance after:',fmt(detail.balanceAfter))+
+    '<div class="sec">Stored response</div><pre class="event-response">'+esc(detail.responseText||'No response text stored')+'</pre>'
+}
+function closeEvent(updateUrl) {
+  eventFocusSequence++
+  document.getElementById('eventModal').hidden=true
+  pinned=null;hover=null
+  if(updateUrl!==false)updateEventUrl(null,'replace')
+  queueRedraw()
+}
+async function openEvent(point,updateUrl) {
   const modal=document.getElementById('eventModal'),body=document.getElementById('eventBody')
+  const focusId=++eventFocusSequence
+  if(updateUrl!==false)updateEventUrl(point.id,'push')
+  document.getElementById('eventTitle').textContent='Event #'+point.id
   modal.hidden=false;body.innerHTML='<span class="dim">Loading event details&hellip;</span>'
   try {
     const response=await fetch('/events/'+encodeURIComponent(point.id))
     if(!response.ok)throw new Error('event request failed ('+response.status+')')
     const detail=(await response.json()).event
-    body.innerHTML=
-      row('Time:',esc(dateTimeFmt.format(new Date(detail.executedAt))))+
-      row('Type:',esc(categoryLabel(detail.category)))+
-      row('Command:',esc(detail.command),'yellow')+
-      row('Balance change:',signed(detail.delta),cls(detail.delta))+
-      row('Balance after:',fmt(detail.balanceAfter))+
-      '<div class="sec">Stored response</div><pre class="event-response">'+esc(detail.responseText||'No response text stored')+'</pre>'
-  } catch(e) { body.innerHTML='<span class="red">'+esc(String(e))+'</span>' }
+    if(focusId===eventFocusSequence)renderEventDetail(detail)
+  } catch(e) { if(focusId===eventFocusSequence)body.innerHTML='<span class="red">'+esc(String(e))+'</span>' }
+}
+async function focusLinkedEvent() {
+  const id=linkedEventId()
+  if(id===null){closeEvent(false);return}
+  const focusId=++eventFocusSequence,modal=document.getElementById('eventModal'),body=document.getElementById('eventBody')
+  document.getElementById('eventTitle').textContent='Event #'+id
+  modal.hidden=false;body.innerHTML='<span class="dim">Loading linked event&hellip;</span>'
+  try {
+    const response=await fetch('/events/'+encodeURIComponent(id))
+    if(!response.ok)throw new Error(response.status===404?'event not found':'event request failed ('+response.status+')')
+    const detail=(await response.json()).event
+    if(focusId!==eventFocusSequence)return
+    renderEventDetail(detail)
+    const stamp=Date.parse(detail.executedAt),from=inputDate('from'),to=inputDate('to')
+    if(!from||!to||stamp<from.getTime()||stamp>to.getTime()){
+      document.getElementById('from').value=localInputValue(new Date(stamp-43200000))
+      document.getElementById('to').value=localInputValue(new Date(stamp+43200000))
+    }
+    liveRangeHours=null;autoFitData=false
+    document.querySelectorAll('[data-range]').forEach(btn=>btn.classList.remove('active'))
+    document.getElementById('categoryFilter').value='all';document.getElementById('impactFilter').value='all'
+    pinned={chartId:'overview',eventId:id};hover=null
+    await refreshCharts(true)
+  } catch(e) {
+    if(focusId!==eventFocusSequence)return
+    body.innerHTML='<span class="red">'+esc(String(e))+'</span>'
+    pinned=null;hover=null
+    await refreshCharts(true)
+  }
 }
 function nearestPoint(points, target) {
   if (!target || !points.length) return null
@@ -319,7 +373,7 @@ function drawChart(def, events, from, to) {
   ctx.textAlign = 'left'
   if (!points.length) { ctx.fillStyle='#657178'; ctx.textAlign='center'; ctx.fillText('No transactions in this window',w/2,h/2); return }
   points.forEach(p => { p.px=x(p.t); p.py=y(p.y) })
-  const stride=def.style==='line'?Math.max(1,Math.ceil(points.length/Math.max(1,pw*2))):1,displayPoints=stride===1?points:points.filter((p,i)=>i%stride===0||i===points.length-1)
+  const stride=def.style==='line'?Math.max(1,Math.ceil(points.length/Math.max(1,pw*2))):1,displayPoints=stride===1?points:points.filter((p,i)=>i%stride===0||i===points.length-1||p.id===pinned?.eventId)
   renderedPoints[def.id] = displayPoints
   const zeroY = y(0)
   if (zeroY >= pad.t && zeroY <= pad.t+ph) { ctx.strokeStyle='#69777e'; ctx.beginPath(); ctx.moveTo(pad.l,zeroY); ctx.lineTo(w-pad.r,zeroY); ctx.stroke() }
@@ -432,12 +486,14 @@ chartDefs.forEach(def=>{
   canvas.addEventListener('click',e=>{if(suppressClick){suppressClick=false;return}const p=position(e),point=nearestPoint(renderedPoints[def.id]||[],p);pinned=point?{chartId:def.id,eventId:point.id}:null;hover=point?{id:def.id,x:p.x,y:p.y}:null;queueChartRedraw(def.id);if(point)openEvent(point)})
   canvas.addEventListener('dblclick',resetZoom)
 })
-document.getElementById('eventClose').addEventListener('click',closeEvent)
+document.getElementById('eventClose').addEventListener('click',()=>closeEvent())
 document.getElementById('eventModal').addEventListener('click',e=>{if(e.target.id==='eventModal')closeEvent()})
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElementById('eventModal').hidden)closeEvent();else if(e.key==='Escape'&&expandedId)toggleExpand(expandedId)})
+window.addEventListener('popstate',()=>{void focusLinkedEvent()})
 window.addEventListener('resize',queueRedraw)
 updateRangeInputs(24);document.querySelector('[data-range="24"]').classList.add('active')
-refreshCharts(true);refresh();setInterval(refresh,1000);setInterval(()=>{if(!analyticsLoading)refreshCharts(false,false)},15000)
+if(linkedEventId()===null)refreshCharts(true);else void focusLinkedEvent()
+refresh();setInterval(refresh,1000);setInterval(()=>{if(!analyticsLoading)refreshCharts(false,false)},15000)
 </script>
 </body>
 </html>`;
