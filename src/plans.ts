@@ -29,8 +29,6 @@ export const Rank = {
 
 export type RankValue = (typeof Rank)[keyof typeof Rank];
 
-const SHOP_BUFFER = 100;
-
 const RANKUP_COSTS: Partial<Record<RankValue, number>> = {
   [Rank.Bankrupt]: 200,
   [Rank.BackyardGarden]: 1_000,
@@ -46,13 +44,6 @@ const SHOP_BASE_COSTS: Partial<Record<Command, number>> = {
   [Actions.SHOP_FERTILIZER]: 30,
   [Actions.SHOP_QUIZ]: 125,
 };
-
-// cdr has no server-side rejection if you can't afford it, cost is floor(15 * rank * (1 + prestige * 0.1))
-function cdrCost(rank: RankValue, prestige: number): number {
-  const effectiveRank = rank !== Rank.Bankrupt ? rank : 5;
-  const prestigeMulti = prestige >= 1 ? 1 + prestige * 0.1 : 1;
-  return Math.floor(15 * effectiveRank * prestigeMulti);
-}
 
 export interface ProgressionReadiness {
   rankupReady: boolean;
@@ -78,22 +69,12 @@ export function progressionReadiness({
 
 export function shouldRun(
   command: Command,
-  {
-    potatoes,
-    rank,
-    prestige,
-  }: { potatoes: number; rank: RankValue; prestige: number },
+  { potatoes, rank }: { potatoes: number; rank: RankValue; prestige: number },
 ): boolean {
-  if (command === Actions.CDR) {
-    return potatoes >= cdrCost(rank, prestige) + SHOP_BUFFER;
-  }
-
   const shopBaseCost = SHOP_BASE_COSTS[command]; // eslint-disable-line security/detect-object-injection
   if (shopBaseCost !== undefined) {
     const shopCost = shopBaseCost * Math.max(1, rank);
-    const followUpCost =
-      command === Actions.SHOP_CDR ? cdrCost(rank, prestige) : 0;
-    return potatoes >= shopCost + followUpCost + SHOP_BUFFER;
+    return potatoes >= shopCost;
   }
 
   return true;

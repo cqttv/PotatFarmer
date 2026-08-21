@@ -27,25 +27,22 @@ test("status parsing ignores unknown fields and builds the expected queue", () =
   ]);
 });
 
-test("plan guards reserve a buffer for cooldown and shop purchases", () => {
-  const player = { potatoes: 129, rank: Rank.BackyardGarden, prestige: 0 };
+test("plan guards allow cdr at any balance and use exact shop costs", () => {
+  const player = { potatoes: -1_000, rank: Rank.BackyardGarden, prestige: 0 };
   assert.equal(shouldRun(Actions.CDR, player), true);
   assert.equal(shouldRun(Actions.SHOP_CDR, player), false);
-  assert.equal(
-    shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 144 }),
-    false,
-  );
-  assert.equal(shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 145 }), true);
+  assert.equal(shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 29 }), false);
+  assert.equal(shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 30 }), true);
   assert.equal(shouldRun(Actions.FARM, { ...player, potatoes: 0 }), true);
 });
 
-test("shop cdr reserves enough potatoes for the purchase and its follow-up", () => {
+test("shop cdr does not reserve potatoes for its cdr follow-up", () => {
   const player = { rank: Rank.Industrial, prestige: 0 };
   assert.equal(
-    shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 369 }),
+    shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 179 }),
     false,
   );
-  assert.equal(shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 370 }), true);
+  assert.equal(shouldRun(Actions.SHOP_CDR, { ...player, potatoes: 180 }), true);
 });
 
 test("progression readiness uses authoritative exact cost boundaries", () => {
@@ -118,30 +115,23 @@ test("status planning only resets cooldowns when both harvest actions are blocke
 
 test("plan guards use PotatBotat rank scaling at exact affordability boundaries", () => {
   const cases = [
-    { command: Actions.CDR, rank: Rank.Bankrupt, prestige: 0, threshold: 175 },
-    {
-      command: Actions.CDR,
-      rank: Rank.TenAcreFarm,
-      prestige: 2,
-      threshold: 172,
-    },
     {
       command: Actions.SHOP_FERTILIZER,
       rank: Rank.Bankrupt,
       prestige: 0,
-      threshold: 130,
+      threshold: 30,
     },
     {
       command: Actions.SHOP_GUARD,
       rank: Rank.Greenhouse,
       prestige: 0,
-      threshold: 300,
+      threshold: 200,
     },
     {
       command: Actions.SHOP_QUIZ,
       rank: Rank.Industrial,
       prestige: 0,
-      threshold: 850,
+      threshold: 750,
     },
   ] as const;
 

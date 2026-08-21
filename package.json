@@ -8,6 +8,7 @@
     "test": "BEARER_TOKEN=test FILE_LOGGING_ENABLED=false node --import tsx --test tests/*.test.ts",
     "build": "tsdown",
     "type-check": "tsc --noEmit",
+    "check": "npm run lint && npm run prettier && npm run type-check && npm run build && npm run test",
     "start": "tsdown && node --env-file=.env dist/main.mjs",
     "start:dev": "npx tsx --env-file=.env src/main.ts",
     "start:pm2": "pm2 start dist/main.mjs --name PotatFarmer --node-args='--env-file=.env'"
